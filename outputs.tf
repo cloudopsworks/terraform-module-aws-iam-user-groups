@@ -28,6 +28,22 @@ output "groups" {
   ])
 }
 
+output "iam_access_keys" {
+  value = [
+    for key in aws_iam_access_key.this : {
+      id                = key.id
+      secret            = key.secret
+      smtp_password     = key.ses_smtp_password_v4
+      user_name         = key.user
+      key_name          = key.name
+      create_date       = key.create_date
+      status            = key.status
+      enc_secret        = key.encrypted_secret
+      enc_smtp_password = key.encrypted_ses_smtp_password_v4
+    }
+  ]
+}
+
 output "policies" {
   value = concat([
     for policy in aws_iam_policy.named : {
