@@ -41,6 +41,7 @@ output "iam_access_keys" {
       enc_smtp_password = key.encrypted_ses_smtp_password_v4
     }
   ]
+  sensitive = true
 }
 
 output "policies" {
