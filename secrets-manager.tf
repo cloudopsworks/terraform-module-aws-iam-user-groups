@@ -23,12 +23,30 @@ resource "aws_secretsmanager_secret_version" "user_login" {
   secret_string = aws_iam_user_login_profile.this[each.key].encrypted_password
 }
 
+resource "aws_secretsmanager_secret" "access_keys_id" {
+  for_each = {
+    for k, v in local.user_access_keys : k => v
+    if var.secrets_manager_store
+  }
+  name = "${local.secret_store_path}/iam-user/access-key-id/${each.value.user_name}/${each.value.key_name}"
+  tags = local.all_tags
+}
+
+resource "aws_secretsmanager_secret_version" "access_keys_id" {
+  for_each = {
+    for k, v in local.user_access_keys : k => v
+    if var.secrets_manager_store
+  }
+  secret_id     = aws_secretsmanager_secret.access_keys_id[each.key].id
+  secret_string = aws_iam_access_key.this[each.key].id
+}
+
 resource "aws_secretsmanager_secret" "access_keys" {
   for_each = {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  name = "${local.secret_store_path}/iam-user/access-key/${each.value.user_name}/${each.value.key_name}"
+  name = "${local.secret_store_path}/iam-user/access-key-secret/${each.value.user_name}/${each.value.key_name}"
   tags = local.all_tags
 }
 
