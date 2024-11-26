@@ -28,7 +28,7 @@ resource "aws_secretsmanager_secret" "access_keys_id" {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  name = "${local.secret_store_path}/iam-user/access-key-id/${each.value.user_name}/${each.value.key_name}"
+  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}/access-key-id"
   tags = local.all_tags
 }
 
@@ -46,7 +46,7 @@ resource "aws_secretsmanager_secret" "access_keys" {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  name = "${local.secret_store_path}/iam-user/access-key-secret/${each.value.user_name}/${each.value.key_name}"
+  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}/access-key-secret"
   tags = local.all_tags
 }
 
@@ -64,7 +64,7 @@ resource "aws_secretsmanager_secret" "access_keys_smtp" {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  name = "${local.secret_store_path}/iam-user/ses-smtp-password/${each.value.user_name}/${each.value.key_name}"
+  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}/ses-smtp-password"
   tags = local.all_tags
 }
 
