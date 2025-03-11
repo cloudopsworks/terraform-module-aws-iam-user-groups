@@ -23,57 +23,25 @@ resource "aws_secretsmanager_secret_version" "user_login" {
   secret_string = aws_iam_user_login_profile.this[each.key].encrypted_password
 }
 
-resource "aws_secretsmanager_secret" "access_keys_id" {
+resource "aws_secretsmanager_secret" "user_secret" {
   for_each = {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}/access-key-id"
+  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}"
   tags = local.all_tags
 }
 
-resource "aws_secretsmanager_secret_version" "access_keys_id" {
+resource "aws_secretsmanager_secret_version" "user_secret" {
   for_each = {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  secret_id     = aws_secretsmanager_secret.access_keys_id[each.key].id
-  secret_string = aws_iam_access_key.this[each.key].id
-}
-
-resource "aws_secretsmanager_secret" "access_keys" {
-  for_each = {
-    for k, v in local.user_access_keys : k => v
-    if var.secrets_manager_store
-  }
-  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}/access-key-secret"
-  tags = local.all_tags
-}
-
-resource "aws_secretsmanager_secret_version" "access_keys" {
-  for_each = {
-    for k, v in local.user_access_keys : k => v
-    if var.secrets_manager_store
-  }
-  secret_id     = aws_secretsmanager_secret.access_keys[each.key].id
-  secret_string = aws_iam_access_key.this[each.key].secret
-}
-
-resource "aws_secretsmanager_secret" "access_keys_smtp" {
-  for_each = {
-    for k, v in local.user_access_keys : k => v
-    if var.secrets_manager_store
-  }
-  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}/ses-smtp-password"
-  tags = local.all_tags
-}
-
-resource "aws_secretsmanager_secret_version" "access_keys_smtp" {
-  for_each = {
-    for k, v in local.user_access_keys : k => v
-    if var.secrets_manager_store
-  }
-  secret_id     = aws_secretsmanager_secret.access_keys[each.key].id
-  secret_string = aws_iam_access_key.this[each.key].ses_smtp_password_v4
+  secret_id = aws_secretsmanager_secret.user_secret[each.key].id
+  secret_string = jsonencode({
+    access_key_id     = aws_iam_access_key.this[each.key].id
+    access_key_secret = aws_iam_access_key.this[each.key].secret
+    ses_smtp_password = aws_iam_access_key.this[each.key].ses_smtp_password_v4
+  })
 }
 
