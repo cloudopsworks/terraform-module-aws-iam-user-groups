@@ -28,7 +28,7 @@ resource "aws_secretsmanager_secret" "user_secret" {
     for k, v in local.user_access_keys : k => v
     if var.secrets_manager_store
   }
-  name = "${local.secret_store_path}/iam-user/${each.value.user_name}/${each.value.key_name}"
+  name = "${local.secret_store_path}/iam-user/${each.value.user_name}"
   tags = local.all_tags
 }
 
