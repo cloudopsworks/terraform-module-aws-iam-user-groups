@@ -10,6 +10,12 @@ variable "secrets_manager_store" {
   default     = false
 }
 
+variable "default_pgp_key" {
+  description = "Default PGP key for encrypting secrets"
+  type        = string
+  default     = ""
+}
+
 variable "users" {
   description = "List of IAM users"
   type        = any
