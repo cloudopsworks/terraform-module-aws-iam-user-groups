@@ -33,7 +33,7 @@ locals {
 # PGP Key for Secrets Manager
 data "aws_secretsmanager_secret_version" "pgp_public_key" {
   count     = var.default_pgp_key != "" && startswith(var.default_pgp_key, "_aws:") ? 1 : 0
-  secret_id = replace(local.default_pgp_key, "_aws:", "")
+  secret_id = replace(var.default_pgp_key, "_aws:", "")
 }
 
 # IAM USERS
