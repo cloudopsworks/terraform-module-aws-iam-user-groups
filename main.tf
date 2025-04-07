@@ -8,13 +8,18 @@ locals {
     for user in var.users : user.name => user
   }
 
+  default_pgp_key = startswith(
+    var.default_pgp_key,
+    "_aws:"
+  ) ? data.aws_secretsmanager_secret_version.pgp_public_key[0].secret_string : var.default_pgp_key
+
   user_access_keys = merge([
     for user in var.users : {
       for key in try(user.access_keys, []) : "${user.name}-${key.name}" => {
         user_name = user.name
         key_name  = key.name
         status    = try(key.status, "Active")
-        pgp_key   = try(user.pgp_key, null)
+        pgp_key   = local.default_pgp_key != "" ? local.default_pgp_key : try(user.pgp_key, null)
       }
     }
   ]...)
@@ -23,6 +28,12 @@ locals {
     for user in var.users : user.name => user
     if try(user.console_access.enabled, false)
   }
+}
+
+# PGP Key for Secrets Manager
+data "aws_secretsmanager_secret_version" "pgp_public_key" {
+  count     = var.default_pgp_key != "" && startswith(var.default_pgp_key, "_aws:") ? 1 : 0
+  secret_id = split(var.default_pgp_key, ":")[1]
 }
 
 # IAM USERS
