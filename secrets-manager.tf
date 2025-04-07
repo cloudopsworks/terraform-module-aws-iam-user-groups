@@ -20,7 +20,7 @@ resource "aws_secretsmanager_secret_version" "user_login" {
     if var.secrets_manager_store
   }
   secret_id     = aws_secretsmanager_secret.user_login[each.key].id
-  secret_string = aws_iam_user_login_profile.this[each.key].encrypted_password
+  secret_string = aws_iam_user_login_profile.this[each.key].password != "" ? aws_iam_user_login_profile.this[each.key].password : aws_iam_user_login_profile.this[each.key].encrypted_password
 }
 
 resource "aws_secretsmanager_secret" "user_secret" {
@@ -40,8 +40,9 @@ resource "aws_secretsmanager_secret_version" "user_secret" {
   secret_id = aws_secretsmanager_secret.user_secret[each.key].id
   secret_string = jsonencode({
     access_key_id     = aws_iam_access_key.this[each.key].id
-    access_key_secret = aws_iam_access_key.this[each.key].secret
+    access_key_secret = aws_iam_access_key.this[each.key].secret != "" ? aws_iam_access_key.this[each.key].secret : aws_iam_access_key.this[each.key].encrypted_secret
     ses_smtp_password = aws_iam_access_key.this[each.key].ses_smtp_password_v4
+    pgp               = aws_iam_access_key.this[each.key].secret != "" ? "no" : "yes"
   })
 }
 
