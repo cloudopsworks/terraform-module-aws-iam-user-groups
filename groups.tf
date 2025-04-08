@@ -139,7 +139,7 @@ data "aws_iam_policy_document" "named_inline" {
   for_each = local.named_inline_policies
   version  = "2012-10-17"
   dynamic "statement" {
-    for_each = each.value.statements
+    for_each = each.value.policy.statements
     content {
       sid       = try(statement.value.sid, null)
       effect    = statement.value.effect
@@ -168,7 +168,7 @@ data "aws_iam_policy_document" "prefixed_inline" {
   for_each = local.prefixed_inline_policies
   version  = "2012-10-17"
   dynamic "statement" {
-    for_each = each.value.statements
+    for_each = each.value.policy.statements
     content {
       sid       = try(statement.value.sid, null)
       effect    = statement.value.effect
