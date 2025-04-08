@@ -7,7 +7,7 @@
 locals {
   named_group_map = {
     for group in var.groups : group.name => group
-    if try(group.name, "") != "" && try(group.name_prefix, "") == "" && !try(group.existing, false)
+    if try(group.name, "") != "" && try(group.name_prefix, "") == ""
   }
 
   # This is only for policy attachments
