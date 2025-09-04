@@ -1,7 +1,10 @@
 ##
-# (c) 2024 - Cloud Ops Works LLC - https://cloudops.works/
-#            On GitHub: https://github.com/cloudopsworks
-#            Distributed Under Apache v2.0 License
+# (c) 2021-2025
+#     Cloud Ops Works LLC - https://cloudops.works/
+#     Find us on:
+#       GitHub: https://github.com/cloudopsworks
+#       WebSite: https://cloudops.works
+#     Distributed Under Apache v2.0 License
 #
 
 # Secrets saving
@@ -40,9 +43,9 @@ resource "aws_secretsmanager_secret_version" "user_secret" {
   secret_id = aws_secretsmanager_secret.user_secret[each.key].id
   secret_string = jsonencode({
     access_key_id     = aws_iam_access_key.this[each.key].id
-    access_key_secret = aws_iam_access_key.this[each.key].secret != "" ? aws_iam_access_key.this[each.key].secret : aws_iam_access_key.this[each.key].encrypted_secret
-    ses_smtp_password = aws_iam_access_key.this[each.key].ses_smtp_password_v4
-    pgp               = aws_iam_access_key.this[each.key].secret != "" ? "no" : "yes"
+    access_key_secret = aws_iam_access_key.this[each.key].secret != null && aws_iam_access_key.this[each.key].secret != "" ? aws_iam_access_key.this[each.key].secret : aws_iam_access_key.this[each.key].encrypted_secret
+    ses_smtp_password = aws_iam_access_key.this[each.key].ses_smtp_password_v4 != null && aws_iam_access_key.this[each.key].ses_smtp_password_v4 != "" ? aws_iam_access_key.this[each.key].ses_smtp_password_v4 : aws_iam_access_key.this[each.key].encrypted_ses_smtp_password_v4
+    pgp               = aws_iam_access_key.this[each.key].secret != null && aws_iam_access_key.this[each.key].secret != "" ? "no" : "yes"
   })
 }
 

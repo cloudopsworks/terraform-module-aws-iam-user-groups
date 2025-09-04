@@ -1,4 +1,4 @@
-name: Terraform Transit Gateway Module
+name: Terraform AWS IAM Users, Groups, and Policies Module
 #logo: logo/logo.jpg
 
 license: "APACHE2"
@@ -6,25 +6,206 @@ license: "APACHE2"
 copyrights:
   - name: "Cloud Ops Works LLC"
     url: "https://cloudops.works"
-    year: "2024"
+    year: "2025"
 
-github_repo: cloudopsworks/terraform-module-aws-vpc-setup
+github_repo: cloudopsworks/terraform-module-aws-iam-user-groups
 
 description: |-
-  VPC Module for setting up transit gateway with ResourceAccessMananger support.
+  A Terraform module to define AWS IAM Users, Groups, and Policies at scale. It supports:
+  - Creating users with optional console access and programmatic access keys.
+  - Managing group membership and policy attachments (managed ARNs, module-defined policies, and inline documents).
+  - Creating reusable IAM policies (named or prefixed), referenced by groups.
+  - Optional storage of generated secrets (console passwords and access keys) in AWS Secrets Manager.
+  - PGP encryption for sensitive outputs, with support for loading a PGP key from AWS Secrets Manager via the "_aws:<secret_id>" convention.
 
 # Introduction to the project
-#introduction: |-
-#  This is an introduction.
+introduction: |-
+  This module standardizes how you bootstrap and manage IAM identities and permissions:
+  - Users can receive console passwords, programmatic access keys, and CodeCommit credentials.
+  - Groups can be created by explicit name or with a name_prefix that is expanded with a deterministic system name derived from organizational context.
+  - Policies can be built with a simple statement structure and reused across groups.
+
+  Naming and tagging are consistent across environments via the `org` object and the `cloudopsworks/tags/local` tagging module.
 
 # How to use this project
-#usage: |-
+usage: |-
+  ## Requirements
+  - Terraform >= 1.3
+  - AWS Provider ~> 6.4
+
+  ## Inputs overview
+  - org (object) – required: organization_name, organization_unit, environment_type, environment_name
+  - spoke_def (string) – optional, defaults to "001"
+  - extra_tags (map(string)) – optional additional tags
+  - secrets_manager_store (bool) – store generated passwords/keys in AWS Secrets Manager
+  - default_pgp_key (string) – default PGP public key (raw armored or "_aws:<secret_id>")
+  - users (list) – IAM users to create and configure
+  - groups (list) – IAM groups (named or prefixed), attachments, and inline policies
+  - policies (list) – IAM policies (named or prefixed) to be referenced by groups
+
+  ## Variable reference (schemas)
+  ```hcl
+  # users = [
+  #   {
+  #     name  = string                      # REQUIRED
+  #     path  = optional(string)
+  #     pgp_key = optional(string)          # raw armored PGP or "_aws:<secret_id>"
+  #     groups = optional(list(string))     # match group.name (named) or group.name_prefix (prefixed)
+  #     access_keys = optional(list(object({
+  #       name   = string
+  #       status = optional(string)         # default "Active"
+  #     })))
+  #     console_access = optional(object({
+  #       enabled                 = bool
+  #       password_length         = optional(number) # default 20
+  #       password_reset_required = optional(bool)   # default true
+  #     }))
+  #     code_commit = optional(object({
+  #       http_credentials = optional(bool)
+  #       ssh_credentials  = optional(bool)
+  #     }))
+  #   }
+  # ]
+
+  # groups = [
+  #   {
+  #     name               = string                 # named group
+  #     path               = optional(string)
+  #     existing           = optional(bool)
+  #     policy_attachments = optional(list(string)) # ARNs
+  #     policy_refs        = optional(list(string)) # link to entries in var.policies
+  #     inline_policies    = optional(list(object({
+  #       name       = string
+  #       statements = list(object({
+  #         sid       = optional(string)
+  #         effect    = string
+  #         actions   = list(string)
+  #         resources = list(string)
+  #         conditions = optional(list(object({
+  #           test     = string
+  #           variable = string
+  #           values   = list(string)
+  #         })))
+  #       }))
+  #     })))
+  #   },
+  #   {
+  #     name_prefix        = string                 # prefixed group
+  #     path               = optional(string)
+  #     policy_attachments = optional(list(string))
+  #     policy_refs        = optional(list(string))
+  #     inline_policies    = optional(list(object({ ... })))
+  #   }
+  # ]
+
+  # policies = [
+  #   {
+  #     name       = string
+  #     statements = list(object({
+  #       sid       = optional(string)
+  #       effect    = string
+  #       actions   = list(string)
+  #       resources = list(string)
+  #       conditions = optional(list(object({
+  #         test     = string
+  #         variable = string
+  #         values   = list(string)
+  #       })))
+  #     }))
+  #   },
+  #   {
+  #     name_prefix = string
+  #     statements  = list(object({ ... }))
+  #   }
+  # ]
+  ```
+
+  Notes:
+  - default_pgp_key may be specified as "_aws:<secret_id>" to fetch the PGP public key from Secrets Manager.
+  - When secrets_manager_store is true, secrets are saved under: /<org_unit>/<environment_name>/<environment_type>.
 
 # Example usage
-#examples: |-
+examples: |-
+  The repository includes runnable boilerplates under `.boilerplate/`.
+
+  Terraform example (from `.boilerplate/terraform/main.tf`):
+  ```hcl
+  module "iam_user_groups" {
+    source = "../.."
+
+    org = {
+      organization_name = "acme"
+      organization_unit = "platform"
+      environment_type  = "prod"
+      environment_name  = "main"
+    }
+
+    spoke_def = "001"
+    extra_tags = { Project = "iam-bootstrap" }
+
+    default_pgp_key       = ""
+    secrets_manager_store = true
+
+    policies = [
+      {
+        name = "ReadOnlyPolicy"
+        statements = [{
+          effect    = "Allow"
+          actions   = ["ec2:Describe*", "s3:List*"]
+          resources = ["*"]
+        }]
+      },
+      {
+        name_prefix = "billing"
+        statements = [{
+          effect    = "Allow"
+          actions   = ["aws-portal:ViewBilling"]
+          resources = ["*"]
+        }]
+      }
+    ]
+
+    groups = [
+      { name = "readers", policy_refs = ["ReadOnlyPolicy"] },
+      { name_prefix = "billing", policy_refs = ["billing"] }
+    ]
+
+    users = [
+      {
+        name = "alice"
+        groups = ["readers"]
+        access_keys = [{ name = "default" }]
+        console_access = { enabled = true, password_length = 20, password_reset_required = true }
+      },
+      {
+        name = "bob"
+        groups = ["billing"]
+        code_commit = { http_credentials = true, ssh_credentials = true }
+      }
+    ]
+  }
+  ```
+
+  Terragrunt example (from `.boilerplate/terragrunt/terragrunt.hcl`):
+  ```hcl
+  terraform {
+    source = "../.." # replace with the module Git/Registry source
+  }
+
+  generate "versions" { ... }
+  generate "provider" { ... }
+
+  inputs = { ...same inputs as the Terraform example... }
+  ```
 
 # How to get started quickly
-#quickstart: |-
+quickstart: |-
+  1. Ensure Terraform >= 1.3 and AWS credentials are configured.
+  2. Copy one of the boilerplates from `.boilerplate/` into your environment repo.
+  3. Adjust `org`, `spoke_def`, and desired `policies`, `groups`, `users`.
+  4. Optionally set `default_pgp_key` (raw armored) or store it in Secrets Manager and set it as `_aws:<secret_id>`.
+  5. If you want to persist generated passwords/keys, set `secrets_manager_store = true`.
+  6. Run `terraform init && terraform apply` (or `terragrunt init && terragrunt apply`).
 
 include:
   - "docs/targets.md"

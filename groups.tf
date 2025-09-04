@@ -1,7 +1,10 @@
 ##
-# (c) 2024 - Cloud Ops Works LLC - https://cloudops.works/
-#            On GitHub: https://github.com/cloudopsworks
-#            Distributed Under Apache v2.0 License
+# (c) 2021-2025
+#     Cloud Ops Works LLC - https://cloudops.works/
+#     Find us on:
+#       GitHub: https://github.com/cloudopsworks
+#       WebSite: https://cloudops.works
+#     Distributed Under Apache v2.0 License
 #
 
 locals {
@@ -78,7 +81,7 @@ locals {
 resource "aws_iam_group" "named" {
   for_each = {
     for key, value in local.named_group_map : key => value
-    if  !try(value.existing, false)
+    if !try(value.existing, false)
   }
   name = each.value.name
   path = try(each.value.path, null)
