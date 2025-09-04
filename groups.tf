@@ -81,7 +81,7 @@ locals {
 resource "aws_iam_group" "named" {
   for_each = {
     for key, value in local.named_group_map : key => value
-    if  !try(value.existing, false)
+    if !try(value.existing, false)
   }
   name = each.value.name
   path = try(each.value.path, null)
