@@ -10,17 +10,12 @@
 
 [![cloudopsworks][logo]](https://cloudops.works/)
 
-# Terraform AWS IAM Users, Groups, and Policies Module
+# AWS IAM Users, Groups, and Policies Module
 
 
 
 
-A Terraform module to define AWS IAM Users, Groups, and Policies at scale. It supports:
-- Creating users with optional console access and programmatic access keys.
-- Managing group membership and policy attachments (managed ARNs, module-defined policies, and inline documents).
-- Creating reusable IAM policies (named or prefixed), referenced by groups.
-- Optional storage of generated secrets (console passwords and access keys) in AWS Secrets Manager.
-- PGP encryption for sensitive outputs, with support for loading a PGP key from AWS Secrets Manager via the "_aws:<secret_id>" convention.
+A comprehensive Terragrunt-ready module to manage AWS IAM identities and permissions at scale. It facilitates the creation of IAM users, groups, and policies with support for secret storage in AWS Secrets Manager and PGP encryption.
 
 
 ---
@@ -55,12 +50,12 @@ We have [*lots of terraform modules*][terraform_modules] that are Open Source an
 
 ## Introduction
 
-This module standardizes how you bootstrap and manage IAM identities and permissions:
-- Users can receive console passwords, programmatic access keys, and CodeCommit credentials.
-- Groups can be created by explicit name or with a name_prefix that is expanded with a deterministic system name derived from organizational context.
-- Policies can be built with a simple statement structure and reused across groups.
-
-Naming and tagging are consistent across environments via the `org` object and the `cloudopsworks/tags/local` tagging module.
+This module provides a standardized way to manage IAM Users, Groups, and Policies across multiple AWS accounts and environments. It integrates seamlessly with Terragrunt for infrastructure-as-code management. Key features include:
+- **IAM User Management**: Create users with console access, programmatic access keys, and CodeCommit credentials.
+- **IAM Group Management**: Define groups with explicit names or prefixes, attach AWS managed policies, module-defined policies, or inline policies.
+- **IAM Policy Management**: Define reusable policies that can be referenced by multiple groups.
+- **Secret Management**: Automatically store generated console passwords and access keys in AWS Secrets Manager.
+- **Security**: Support for PGP encryption for sensitive outputs, including loading keys from Secrets Manager.
 
 ## Usage
 
@@ -69,120 +64,15 @@ Naming and tagging are consistent across environments via the `org` object and t
 Instead pin to the release tag (e.g. `?ref=vX.Y.Z`) of one of our [latest releases](https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups/releases).
 
 
-## Requirements
-- Terraform >= 1.3
-- AWS Provider ~> 6.4
+To use this module with Terragrunt, include it in your `terragrunt.hcl` file.
 
-## Inputs overview
-- org (object) – required: organization_name, organization_unit, environment_type, environment_name
-- spoke_def (string) – optional, defaults to "001"
-- extra_tags (map(string)) – optional additional tags
-- secrets_manager_store (bool) – store generated passwords/keys in AWS Secrets Manager
-- default_pgp_key (string) – default PGP public key (raw armored or "_aws:<secret_id>")
-- users (list) – IAM users to create and configure
-- groups (list) – IAM groups (named or prefixed), attachments, and inline policies
-- policies (list) – IAM policies (named or prefixed) to be referenced by groups
-
-## Variable reference (schemas)
+### Terragrunt Configuration
 ```hcl
-# users = [
-#   {
-#     name  = string                      # REQUIRED
-#     path  = optional(string)
-#     pgp_key = optional(string)          # raw armored PGP or "_aws:<secret_id>"
-#     groups = optional(list(string))     # match group.name (named) or group.name_prefix (prefixed)
-#     access_keys = optional(list(object({
-#       name   = string
-#       status = optional(string)         # default "Active"
-#     })))
-#     console_access = optional(object({
-#       enabled                 = bool
-#       password_length         = optional(number) # default 20
-#       password_reset_required = optional(bool)   # default true
-#     }))
-#     code_commit = optional(object({
-#       http_credentials = optional(bool)
-#       ssh_credentials  = optional(bool)
-#     }))
-#   }
-# ]
+terraform {
+  source = "git::https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups.git?ref=v1.0.0"
+}
 
-# groups = [
-#   {
-#     name               = string                 # named group
-#     path               = optional(string)
-#     existing           = optional(bool)
-#     policy_attachments = optional(list(string)) # ARNs
-#     policy_refs        = optional(list(string)) # link to entries in var.policies
-#     inline_policies    = optional(list(object({
-#       name       = string
-#       statements = list(object({
-#         sid       = optional(string)
-#         effect    = string
-#         actions   = list(string)
-#         resources = list(string)
-#         conditions = optional(list(object({
-#           test     = string
-#           variable = string
-#           values   = list(string)
-#         })))
-#       }))
-#     })))
-#   },
-#   {
-#     name_prefix        = string                 # prefixed group
-#     path               = optional(string)
-#     policy_attachments = optional(list(string))
-#     policy_refs        = optional(list(string))
-#     inline_policies    = optional(list(object({ ... })))
-#   }
-# ]
-
-# policies = [
-#   {
-#     name       = string
-#     statements = list(object({
-#       sid       = optional(string)
-#       effect    = string
-#       actions   = list(string)
-#       resources = list(string)
-#       conditions = optional(list(object({
-#         test     = string
-#         variable = string
-#         values   = list(string)
-#       })))
-#     }))
-#   },
-#   {
-#     name_prefix = string
-#     statements  = list(object({ ... }))
-#   }
-# ]
-```
-
-Notes:
-- default_pgp_key may be specified as "_aws:<secret_id>" to fetch the PGP public key from Secrets Manager.
-- When secrets_manager_store is true, secrets are saved under: /<org_unit>/<environment_name>/<environment_type>.
-
-## Quick Start
-
-1. Ensure Terraform >= 1.3 and AWS credentials are configured.
-2. Copy one of the boilerplates from `.boilerplate/` into your environment repo.
-3. Adjust `org`, `spoke_def`, and desired `policies`, `groups`, `users`.
-4. Optionally set `default_pgp_key` (raw armored) or store it in Secrets Manager and set it as `_aws:<secret_id>`.
-5. If you want to persist generated passwords/keys, set `secrets_manager_store = true`.
-6. Run `terraform init && terraform apply` (or `terragrunt init && terragrunt apply`).
-
-
-## Examples
-
-The repository includes runnable boilerplates under `.boilerplate/`.
-
-Terraform example (from `.boilerplate/terraform/main.tf`):
-```hcl
-module "iam_user_groups" {
-  source = "../.."
-
+inputs = {
   org = {
     organization_name = "acme"
     organization_unit = "platform"
@@ -191,61 +81,186 @@ module "iam_user_groups" {
   }
 
   spoke_def = "001"
-  extra_tags = { Project = "iam-bootstrap" }
+  is_hub    = false
 
-  default_pgp_key       = ""
+  extra_tags = {
+    Project = "IAM-Management"
+  }
+
   secrets_manager_store = true
+  default_pgp_key       = "_aws:prod/shared/pgp/public"
 
   policies = [
     {
-      name = "ReadOnlyPolicy"
-      statements = [{
-        effect    = "Allow"
-        actions   = ["ec2:Describe*", "s3:List*"]
-        resources = ["*"]
-      }]
-    },
-    {
-      name_prefix = "billing"
-      statements = [{
-        effect    = "Allow"
-        actions   = ["aws-portal:ViewBilling"]
-        resources = ["*"]
-      }]
+      name = "S3ReadOnly"
+      statements = [
+        {
+          effect    = "Allow"
+          actions   = ["s3:Get*", "s3:List*"]
+          resources = ["*"]
+        }
+      ]
     }
   ]
 
   groups = [
-    { name = "readers", policy_refs = ["ReadOnlyPolicy"] },
-    { name_prefix = "billing", policy_refs = ["billing"] }
+    {
+      name        = "developers"
+      policy_refs = ["S3ReadOnly"]
+    }
   ]
 
   users = [
     {
-      name = "alice"
-      groups = ["readers"]
-      access_keys = [{ name = "default" }]
-      console_access = { enabled = true, password_length = 20, password_reset_required = true }
-    },
-    {
-      name = "bob"
-      groups = ["billing"]
-      code_commit = { http_credentials = true, ssh_credentials = true }
+      name   = "john.doe"
+      groups = ["developers"]
+      console_access = {
+        enabled = true
+      }
     }
   ]
 }
 ```
 
-Terragrunt example (from `.boilerplate/terragrunt/terragrunt.hcl`):
+### Variables Documentation (YAML Format)
+```yaml
+# Organization definition
+org:
+  organization_name: "acme" # (Required) Name of the organization
+  organization_unit: "platform" # (Required) Name of the organizational unit
+  environment_type: "prod" # (Required) Type of environment (e.g., prod, dev, staging)
+  environment_name: "main" # (Required) Name of the environment
+
+# Spoke definition
+spoke_def: "001" # (Optional) Spoke definition identifier. Default: "001"
+
+# Hub/Spoke configuration
+is_hub: false # (Optional) Establish if this is a HUB or spoke configuration. Default: false
+
+# Extra tags
+extra_tags: {} # (Optional) Additional tags to be applied to all resources. Default: {}
+
+# Global settings
+secrets_manager_store: false # (Optional) When true, the module saves generated secrets into AWS Secrets Manager. Default: false
+default_pgp_key: "" # (Optional) Default PGP key used to encrypt sensitive values. Default: ""
+
+# Users configuration
+users:
+  - name: "username" # (Required) IAM user name
+    path: "/" # (Optional) IAM path (e.g., "/service/"). Default: "/"
+    pgp_key: "armored_pgp_key" # (Optional) PGP key for this user. Default: ""
+    groups: ["group1"] # (Optional) List of groups the user belongs to. Default: []
+    access_keys: # (Optional) List of access keys to create. Default: []
+      - name: "key1" # (Required) Logical name for the key
+        status: "Active" # (Optional) Status of the key. Possible values: "Active", "Inactive". Default: "Active"
+    console_access: # (Optional) AWS Console access configuration. Default: null
+      enabled: true # (Required) When true, create login profile
+      password_length: 20 # (Optional) Password length. Default: 20
+      password_reset_required: true # (Optional) Whether password reset is required. Default: true
+    code_commit: # (Optional) AWS CodeCommit credentials. Default: null
+      http_credentials: true # (Optional) Create HTTP credentials. Default: false
+      ssh_credentials: true # (Optional) Create SSH credentials. Default: false
+
+# Groups configuration
+groups:
+  - name: "groupname" # (Optional) Named group (explicit name). Either name or name_prefix is REQUIRED.
+    path: "/" # (Optional) IAM path. Default: "/"
+    existing: false # (Optional) If true, reference existing IAM group by name. Default: false
+    policy_attachments: ["arn:aws:iam::aws:policy/ReadOnlyAccess"] # (Optional) Attach existing AWS managed policies by ARN. Default: []
+    policy_refs: ["policy1"] # (Optional) Attach policies created by this module via var.policies. Default: []
+    inline_policies: # (Optional) Inline policies to create and attach to this group. Default: []
+      - name: "inline-policy" # (Required) Name of the inline policy
+        statements: # (Required) List of policy statements
+          - sid: "sid1" # (Optional) Statement ID
+            effect: "Allow" # (Required) Effect. Possible values: "Allow", "Deny"
+            actions: ["s3:ListBucket"] # (Required) List of actions
+            resources: ["arn:aws:s3:::bucket-name"] # (Required) List of resources
+            conditions: # (Optional) List of conditions. Default: []
+              - test: "StringEquals" # (Required) Condition test
+                variable: "aws:PrincipalTag/Department" # (Required) Condition variable
+                values: ["IT"] # (Required) Condition values
+
+# Policies configuration
+policies:
+  - name: "policyname" # (Optional) Named policy. Either name or name_prefix is REQUIRED.
+    statements: # (Required) List of policy statements
+      - sid: "sid1" # (Optional) Statement ID
+        effect: "Allow" # (Required) Effect. Possible values: "Allow", "Deny"
+        actions: ["s3:ListBucket"] # (Required) List of actions
+        resources: ["arn:aws:s3:::bucket-name"] # (Required) List of resources
+```
+
+## Quick Start
+
+1.  **Install Terragrunt**: Ensure you have Terragrunt and Terraform installed.
+2.  **Create `terragrunt.hcl`**: Use the example above to create your configuration.
+3.  **Configure AWS Credentials**: Set up your AWS environment variables or profile.
+4.  **Initialize and Apply**:
+    ```bash
+    terragrunt init
+    terragrunt apply
+    ```
+5.  **Verify**: Check the AWS Console for the created users, groups, and policies. If `secrets_manager_store` was enabled, find the credentials in AWS Secrets Manager.
+
+
+## Examples
+
+### Full Terragrunt Example
 ```hcl
-terraform {
-  source = "../.." # replace with the module Git/Registry source
+include "root" {
+  path = find_in_parent_folders()
 }
 
-generate "versions" { ... }
-generate "provider" { ... }
+terraform {
+  source = "git::https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups.git?ref=v1.0.0"
+}
 
-inputs = { ...same inputs as the Terraform example... }
+inputs = {
+  org = {
+    organization_name = "cloudopsworks"
+    organization_unit = "operations"
+    environment_type  = "prod"
+    environment_name  = "shared"
+  }
+
+  secrets_manager_store = true
+
+  policies = [
+    {
+      name = "AdministratorAccessCustom"
+      statements = [
+        {
+          effect    = "Allow"
+          actions   = ["*"]
+          resources = ["*"]
+        }
+      ]
+    }
+  ]
+
+  groups = [
+    {
+      name        = "admins"
+      policy_refs = ["AdministratorAccessCustom"]
+    }
+  ]
+
+  users = [
+    {
+      name   = "admin.user"
+      groups = ["admins"]
+      console_access = {
+        enabled = true
+        password_reset_required = true
+      }
+      access_keys = [
+        {
+          name = "primary"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 
@@ -371,7 +386,7 @@ Please use the [issue tracker](https://github.com/cloudopsworks/terraform-module
 
 ## Copyrights
 
-Copyright © 2025-2025 [Cloud Ops Works LLC](https://cloudops.works)
+Copyright © 2025-2026 [Cloud Ops Works LLC](https://cloudops.works)
 
 
 
@@ -450,10 +465,10 @@ This project is maintained by [Cloud Ops Works LLC][website].
   [readme_footer_link]: https://cloudops.works/readme/footer/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-iam-user-groups&utm_content=readme_footer_link
   [readme_commercial_support_img]: https://cloudops.works/readme/commercial-support/img
   [readme_commercial_support_link]: https://cloudops.works/readme/commercial-support/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-iam-user-groups&utm_content=readme_commercial_support_link
-  [share_twitter]: https://twitter.com/intent/tweet/?text=Terraform+AWS+IAM+Users,+Groups,+and+Policies+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
-  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=Terraform+AWS+IAM+Users,+Groups,+and+Policies+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+  [share_twitter]: https://twitter.com/intent/tweet/?text=AWS+IAM+Users,+Groups,+and+Policies+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=AWS+IAM+Users,+Groups,+and+Policies+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [share_reddit]: https://reddit.com/submit/?url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [share_facebook]: https://facebook.com/sharer/sharer.php?u=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [share_googleplus]: https://plus.google.com/share?url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
-  [share_email]: mailto:?subject=Terraform+AWS+IAM+Users,+Groups,+and+Policies+Module&body=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+  [share_email]: mailto:?subject=AWS+IAM+Users,+Groups,+and+Policies+Module&body=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [beacon]: https://ga-beacon.cloudops.works/G-7XWMFVFXZT/cloudopsworks/terraform-module-aws-iam-user-groups?pixel&cs=github&cm=readme&an=terraform-module-aws-iam-user-groups
