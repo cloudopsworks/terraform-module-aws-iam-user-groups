@@ -348,9 +348,9 @@ Available targets:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_archive"></a> [archive](#provider\_archive) | 2.8.0 |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.51.0 |
-| <a name="provider_tls"></a> [tls](#provider\_tls) | 4.3.0 |
+| <a name="provider_archive"></a> [archive](#provider\_archive) | ~> 2.7 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.35 |
+| <a name="provider_tls"></a> [tls](#provider\_tls) | n/a |
 
 ## Modules
 
