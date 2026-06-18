@@ -22,8 +22,9 @@ locals {
         user_name = user.name
         key_name  = key.name
         status    = try(key.status, "Active")
-        pgp_key   = local.default_pgp_key != "" ? local.default_pgp_key : try(user.pgp_key, null)
+        pgp_key   = try(local.user_pgp_key_map[user.name], "") != "" ? local.user_pgp_key_map[user.name] : null
       }
+      if !local.access_key_rotation_enabled || !contains(local.access_key_rotation_user_config_target_names, user.name)
     }
   ]...)
 
@@ -57,7 +58,7 @@ resource "aws_iam_access_key" "this" {
 resource "aws_iam_user_login_profile" "this" {
   for_each                = local.user_console_access
   user                    = aws_iam_user.this[each.key].name
-  pgp_key                 = try(each.value.pgp_key, null)
+  pgp_key                 = try(local.user_pgp_key_map[each.key], "") != "" ? local.user_pgp_key_map[each.key] : null
   password_length         = try(each.value.console_access.password_length, 20)
   password_reset_required = try(each.value.console_access.password_reset_required, true)
 }

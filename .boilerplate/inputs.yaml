@@ -1,18 +1,65 @@
 # Module configuration
-# Required variables
-{{- range .requiredVariables }}
-{{- if ne .Name "org"}}
-# Description {{ .Description }} , Type: {{ .Type }}
-{{ .Name }}: {{ .DefaultValuePlaceholder }}
-{{- end }}
 
-{{- end }}
-# Optional variables
-{{- range .optionalVariables }}
-{{- if ne .Name "is_hub" "spoke_def" "extra_args" }}
-# Description {{ .Description }} , Type: {{ .Type }}
-#{{ .Name }}: {{ .DefaultValue }}
-{{- end }}
+secrets_manager_store: false # (Optional) Store Terraform-generated console passwords and access keys in AWS Secrets Manager under /<org_unit>/<environment_name>/<environment_type>. Default: false
 
-{{- end }}
+default_pgp_key: "" # (Optional) Default PGP key for console passwords and access keys; use raw armored PGP or "_aws:<secret_id>" to load from Secrets Manager. Default: ""
 
+access_key_rotation: # (Optional) Opt-in AWS Secrets Manager rotation control plane. Default: disabled
+  enabled: false # (Optional) Configure AWS Secrets Manager rotation for selected IAM users. Default: false
+  create_lambda: true # (Optional) Create the module IAM access key rotation Lambda. Set false to use lambda_arn. Default: true
+  lambda_arn: null # (Optional) Existing rotation Lambda ARN when create_lambda is false. Default: null
+  lambda_layer_arns: [] # (Optional) Lambda layer ARNs. Required when PGP is active with the module-created Lambda; include a layer with pgpy. Default: []
+  lambda_timeout: 60 # (Optional) Module-created Lambda timeout in seconds. Default: 60
+  lambda_memory_size: 256 # (Optional) Module-created Lambda memory size in MB. Default: 256
+  lambda_function_name: "" # (Optional) Module-created Lambda function name; blank uses <system_name_short>-iam-key-rotation and is truncated to 64 characters. Default: ""
+  lambda_role_name: "" # (Optional) Module-created Lambda IAM role name; blank uses <system_name_short>-iam-key-rotation-lambda and is truncated to 64 characters. Default: ""
+  log_retention_days: 30 # (Optional) CloudWatch log retention for the module-created Lambda. Default: 30
+  automatically_after_days: 90 # (Optional) Secrets Manager rotation interval when schedule_expression is not set. Default: rotate_after_days
+  schedule_expression: null # (Optional) Secrets Manager schedule expression such as "rate(30 days)"; do not set with automatically_after_days. Default: null
+  schedule_duration: null # (Optional) Rotation window duration such as "2h" when schedule_expression is set. Default: null
+  rotate_immediately: false # (Optional) Rotate immediately when AWS Secrets Manager rotation is configured. Default: false
+  rotate_after_days: 90 # (Optional) Lambda-side minimum age before creating a replacement key. Default: 90
+  grace_period_days: 7 # (Optional) Days before older non-current keys are deactivated during a rotation invocation. Default: 7
+  inactive_key_retention_days: 30 # (Optional) Additional days before deleting inactive keys when delete_inactive_keys is true. Default: 30
+  delete_inactive_keys: false # (Optional) Delete inactive keys after grace_period_days + inactive_key_retention_days. Default: false
+  users: [] # (Optional) Explicit module-managed user allowlist; when non-empty it overrides group-derived selection. Default: []
+  groups: [] # (Optional) Group references from users[*].groups used to derive selected users when users is empty. Default: []
+  exclude_users: [] # (Optional) Module-managed users removed from all-users, explicit, or group-derived scope. Default: []
+  create_secrets: true # (Optional) Create one Secrets Manager secret per selected user and configure rotation on it. Default: true
+  secret_prefix: "" # (Optional) Prefix for module-created Secrets Manager secrets; blank uses /<org_unit>/<environment_name>/<environment_type>/iam-user/access-key-rotation. Default: ""
+  secret_arns: {} # (Optional) Map of user name to existing Secrets Manager secret ARN/name when create_secrets is false or custom destinations are required. Default: {}
+  secret_kms_key_id: null # (Optional) KMS key ID/ARN for module-created rotation secrets and config. Default: null
+  secret_recovery_window_in_days: 30 # (Optional) Recovery window in days for module-created Secrets Manager secrets. Default: 30
+  config_secret_name: "" # (Optional) Name for the module-created Lambda configuration secret; blank uses <secret_prefix>/_rotation-config. Default: ""
+
+users: [] # (Optional) IAM users managed by this module. Default: []
+# users:
+#   - name: "username" # (Required) IAM user name.
+#     path: "/" # (Optional) IAM user path. Default: "/"
+#     pgp_key: "" # (Optional) User-specific PGP key; use raw armored PGP or "_aws:<secret_id>". Default: ""
+#     access_key_rotation_enabled: true # (Optional) Set false to opt this user out of module-level access_key_rotation selection. Default: true
+#     groups: ["developers"] # (Optional) Group memberships; use group.name for named groups or group.name_prefix for prefixed groups. Default: []
+#     access_keys: [] # (Optional) Terraform-managed access keys. Skipped automatically while this user is managed by access_key_rotation to avoid aws_iam_access_key recreation. Default: []
+#     console_access: null # (Optional) Console login profile configuration. Default: null
+#     code_commit: null # (Optional) CodeCommit HTTP/SSH credential configuration. Default: null
+
+groups: [] # (Optional) IAM groups managed or referenced by this module. Default: []
+# groups:
+#   - name: "developers" # (Optional) Explicit group name. Either name or name_prefix is required.
+#     name_prefix: "" # (Optional) Prefix for generated group name "<name_prefix>-<system_name>". Either name or name_prefix is required.
+#     path: "/" # (Optional) IAM group path. Default: "/"
+#     existing: false # (Optional) Reference an existing IAM group by name instead of creating it. Default: false
+#     policy_attachments: [] # (Optional) Existing managed policy ARNs to attach. Default: []
+#     policy_refs: [] # (Optional) Names or prefixes of policies created by this module to attach. Default: []
+#     inline_policies: [] # (Optional) Inline policies to create on the group. Default: []
+
+policies: [] # (Optional) IAM managed policies created by this module. Default: []
+# policies:
+#   - name: "S3ReadOnly" # (Optional) Explicit policy name. Either name or name_prefix is required.
+#     name_prefix: "" # (Optional) Prefix for generated policy name "<name_prefix>-<system_name>". Either name or name_prefix is required.
+#     statements: # (Required) IAM policy statements.
+#       - sid: "ListBuckets" # (Optional) Statement ID.
+#         effect: "Allow" # (Required) Statement effect. Valid values: "Allow", "Deny".
+#         actions: ["s3:ListAllMyBuckets"] # (Required) IAM actions.
+#         resources: ["*"] # (Required) IAM resources.
+#         conditions: [] # (Optional) IAM conditions with test, variable, and values. Default: []
