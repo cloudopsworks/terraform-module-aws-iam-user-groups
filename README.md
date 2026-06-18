@@ -10,12 +10,12 @@
 
 [![cloudopsworks][logo]](https://cloudopsworks.co/)
 
-# AWS IAM Users, Groups, and Policies Module
+# AWS IAM Users, Groups, Policies, and Access Key Rotation Module
+
+ [![Latest Release](https://img.shields.io/github/release/cloudopsworks/terraform-module-aws-iam-user-groups.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups/releases/latest) [![Last Updated](https://img.shields.io/github/last-commit/cloudopsworks/terraform-module-aws-iam-user-groups.svg?style=for-the-badge)](https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups/commits)
 
 
-
-
-A comprehensive Terragrunt-ready module to manage AWS IAM identities and permissions at scale. It facilitates the creation of IAM users, groups, and policies with support for secret storage in AWS Secrets Manager and PGP encryption.
+Terragrunt-ready AWS IAM module for users, groups, managed policies, optional Secrets Manager storage, stable non-secret outputs, and an opt-in AWS Secrets Manager rotation configuration for IAM access keys backed by Lambda.
 
 
 ---
@@ -45,12 +45,16 @@ We have [*lots of terraform modules*][terraform_modules] that are Open Source an
 
 ## Introduction
 
-This module provides a standardized way to manage IAM Users, Groups, and Policies across multiple AWS accounts and environments. It integrates seamlessly with Terragrunt for infrastructure-as-code management. Key features include:
-- **IAM User Management**: Create users with console access, programmatic access keys, and CodeCommit credentials.
-- **IAM Group Management**: Define groups with explicit names or prefixes, attach AWS managed policies, module-defined policies, or inline policies.
-- **IAM Policy Management**: Define reusable policies that can be referenced by multiple groups.
-- **Secret Management**: Automatically store generated console passwords and access keys in AWS Secrets Manager.
-- **Security**: Support for PGP encryption for sensitive outputs, including loading keys from Secrets Manager.
+This module standardizes IAM user, group, and policy management across CloudOps Works AWS accounts and environments. It is designed for Terragrunt scaffolding and exposes stable non-secret metadata outputs for downstream modules and operations.
+
+Key capabilities include:
+- **IAM User Management**: Create IAM users with optional console access, Terraform-managed programmatic access keys, and CodeCommit credentials.
+- **IAM Group Management**: Create named or prefixed groups, reference existing groups, attach AWS managed policies, attach module-defined policies, and define inline group policies.
+- **IAM Policy Management**: Create reusable managed policies from structured statement definitions.
+- **Secret Storage**: Optionally store Terraform-generated console passwords and access keys in AWS Secrets Manager with PGP encryption support.
+- **Access Key Rotation**: Optionally configure AWS Secrets Manager rotation for selected module-managed users. Secrets Manager invokes a rotation Lambda that creates replacement IAM access keys and writes new key material directly into each user's secret.
+- **PGP-aware Rotation**: The module-created rotation Lambda receives the same resolved PGP public key contract used by Terraform-managed access keys (user-level `pgp_key` when present, otherwise `default_pgp_key`). When PGP is active, provide a Lambda layer containing `pgpy` so the Lambda stores encrypted replacement secrets.
+- **Operational Outputs**: Export user, group, membership, policy attachment, secret reference, and rotation metadata without returning access key secret values.
 
 ## Usage
 
@@ -59,203 +63,263 @@ This module provides a standardized way to manage IAM Users, Groups, and Policie
 Instead pin to the release tag (e.g. `?ref=vX.Y.Z`) of one of our [latest releases](https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups/releases).
 
 
-To use this module with Terragrunt, include it in your `terragrunt.hcl` file.
+## Terragrunt scaffolding workflow
 
-### Terragrunt Configuration
+Use Terragrunt's scaffold command so the module-generated `terragrunt.hcl`, `inputs.yaml`, and `local-tags.json` are created consistently.
+
+```sh
+# 1. Create and enter the target deployment directory
+mkdir -p prod/useast1/security/iam-user-groups
+cd prod/useast1/security/iam-user-groups
+
+# 2. Scaffold the module (do NOT use --working-dir)
+terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+
+# 3. Edit inputs.yaml with deployment-specific values
+#    (all keys and comments are pre-populated from .boilerplate/inputs.yaml)
+vi inputs.yaml
+
+# 4. Apply
+terragrunt apply
+```
+
+## Generated `inputs.yaml`
+
+The scaffolded `inputs.yaml` contains all module-specific variables. Values such as `org`, `spoke_def`, `is_hub`, and `extra_tags` are supplied by the Terragrunt hierarchy and are intentionally not included here.
+
+```yaml
+# Module configuration
+
+secrets_manager_store: false # (Optional) Store Terraform-generated console passwords and access keys in AWS Secrets Manager under /<org_unit>/<environment_name>/<environment_type>. Default: false
+
+default_pgp_key: "" # (Optional) Default PGP key for console passwords and access keys; use raw armored PGP or "_aws:<secret_id>" to load from Secrets Manager. Default: ""
+
+access_key_rotation: # (Optional) Opt-in AWS Secrets Manager rotation control plane. Default: disabled
+  enabled: false # (Optional) Configure AWS Secrets Manager rotation for selected IAM users. Default: false
+  create_lambda: true # (Optional) Create the module IAM access key rotation Lambda. Set false to use lambda_arn. Default: true
+  lambda_arn: null # (Optional) Existing rotation Lambda ARN when create_lambda is false. Default: null
+  lambda_layer_arns: [] # (Optional) Lambda layer ARNs. Required when PGP is active with the module-created Lambda; include a layer with pgpy. Default: []
+  lambda_timeout: 60 # (Optional) Module-created Lambda timeout in seconds. Default: 60
+  lambda_memory_size: 256 # (Optional) Module-created Lambda memory size in MB. Default: 256
+  lambda_function_name: "" # (Optional) Module-created Lambda function name; blank uses <system_name_short>-iam-key-rotation and is truncated to 64 characters. Default: ""
+  lambda_role_name: "" # (Optional) Module-created Lambda IAM role name; blank uses <system_name_short>-iam-key-rotation-lambda and is truncated to 64 characters. Default: ""
+  log_retention_days: 30 # (Optional) CloudWatch log retention for the module-created Lambda. Default: 30
+  automatically_after_days: 90 # (Optional) Secrets Manager rotation interval when schedule_expression is not set. Default: rotate_after_days
+  schedule_expression: null # (Optional) Secrets Manager schedule expression such as "rate(30 days)"; do not set with automatically_after_days. Default: null
+  schedule_duration: null # (Optional) Rotation window duration such as "2h" when schedule_expression is set. Default: null
+  rotate_immediately: false # (Optional) Rotate immediately when AWS Secrets Manager rotation is configured. Default: false
+  rotate_after_days: 90 # (Optional) Lambda-side minimum age before creating a replacement key. Default: 90
+  grace_period_days: 7 # (Optional) Days before older non-current keys are deactivated during a rotation invocation. Default: 7
+  inactive_key_retention_days: 30 # (Optional) Additional days before deleting inactive keys when delete_inactive_keys is true. Default: 30
+  delete_inactive_keys: false # (Optional) Delete inactive keys after grace_period_days + inactive_key_retention_days. Default: false
+  users: [] # (Optional) Explicit module-managed user allowlist; when non-empty it overrides group-derived selection. Default: []
+  groups: [] # (Optional) Group references from users[*].groups used to derive selected users when users is empty. Default: []
+  exclude_users: [] # (Optional) Module-managed users removed from all-users, explicit, or group-derived scope. Default: []
+  create_secrets: true # (Optional) Create one Secrets Manager secret per selected user and configure rotation on it. Default: true
+  secret_prefix: "" # (Optional) Prefix for module-created Secrets Manager secrets; blank uses /<org_unit>/<environment_name>/<environment_type>/iam-user/access-key-rotation. Default: ""
+  secret_arns: {} # (Optional) Map of user name to existing Secrets Manager secret ARN/name when create_secrets is false or custom destinations are required. Default: {}
+  secret_kms_key_id: null # (Optional) KMS key ID/ARN for module-created rotation secrets and config. Default: null
+  secret_recovery_window_in_days: 30 # (Optional) Recovery window in days for module-created Secrets Manager secrets. Default: 30
+  config_secret_name: "" # (Optional) Name for the module-created Lambda configuration secret; blank uses <secret_prefix>/_rotation-config. Default: ""
+
+users: [] # (Optional) IAM users managed by this module. Default: []
+# users:
+#   - name: "username" # (Required) IAM user name.
+#     path: "/" # (Optional) IAM user path. Default: "/"
+#     pgp_key: "" # (Optional) User-specific PGP key; use raw armored PGP or "_aws:<secret_id>". Default: ""
+#     access_key_rotation_enabled: true # (Optional) Set false to opt this user out of module-level access_key_rotation selection. Default: true
+#     groups: ["developers"] # (Optional) Group memberships; use group.name for named groups or group.name_prefix for prefixed groups. Default: []
+#     access_keys: [] # (Optional) Terraform-managed access keys. Skipped automatically while this user is managed by access_key_rotation to avoid aws_iam_access_key recreation. Default: []
+#     console_access: null # (Optional) Console login profile configuration. Default: null
+#     code_commit: null # (Optional) CodeCommit HTTP/SSH credential configuration. Default: null
+
+groups: [] # (Optional) IAM groups managed or referenced by this module. Default: []
+# groups:
+#   - name: "developers" # (Optional) Explicit group name. Either name or name_prefix is required.
+#     name_prefix: "" # (Optional) Prefix for generated group name "<name_prefix>-<system_name>". Either name or name_prefix is required.
+#     path: "/" # (Optional) IAM group path. Default: "/"
+#     existing: false # (Optional) Reference an existing IAM group by name instead of creating it. Default: false
+#     policy_attachments: [] # (Optional) Existing managed policy ARNs to attach. Default: []
+#     policy_refs: [] # (Optional) Names or prefixes of policies created by this module to attach. Default: []
+#     inline_policies: [] # (Optional) Inline policies to create on the group. Default: []
+
+policies: [] # (Optional) IAM managed policies created by this module. Default: []
+# policies:
+#   - name: "S3ReadOnly" # (Optional) Explicit policy name. Either name or name_prefix is required.
+#     name_prefix: "" # (Optional) Prefix for generated policy name "<name_prefix>-<system_name>". Either name or name_prefix is required.
+#     statements: # (Required) IAM policy statements.
+#       - sid: "ListBuckets" # (Optional) Statement ID.
+#         effect: "Allow" # (Required) Statement effect. Valid values: "Allow", "Deny".
+#         actions: ["s3:ListAllMyBuckets"] # (Required) IAM actions.
+#         resources: ["*"] # (Required) IAM resources.
+#         conditions: [] # (Optional) IAM conditions with test, variable, and values. Default: []
+```
+
+## Generated `terragrunt.hcl`
+
+The scaffolded `terragrunt.hcl` wires `inputs.yaml` into the module inputs and merges tag files from the Terragrunt hierarchy.
+
 ```hcl
+locals {
+  local_vars  = yamldecode(file("./inputs.yaml"))
+  spoke_vars  = yamldecode(file(find_in_parent_folders("spoke-inputs.yaml")))
+  region_vars = yamldecode(file(find_in_parent_folders("region-inputs.yaml")))
+  env_vars    = yamldecode(file(find_in_parent_folders("env-inputs.yaml")))
+  global_vars = yamldecode(file(find_in_parent_folders("global-inputs.yaml")))
+
+  local_tags  = jsondecode(file("./local-tags.json"))
+  spoke_tags  = jsondecode(file(find_in_parent_folders("spoke-tags.json")))
+  region_tags = jsondecode(file(find_in_parent_folders("region-tags.json")))
+  env_tags    = jsondecode(file(find_in_parent_folders("env-tags.json")))
+  global_tags = jsondecode(file(find_in_parent_folders("global-tags.json")))
+
+  tags = merge(
+    local.global_tags,
+    local.env_tags,
+    local.region_tags,
+    local.spoke_tags,
+    local.local_tags
+  )
+}
+
+include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
 terraform {
-  source = "git::https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups.git?ref=v1.0.0"
+  source = "github.com/cloudopsworks/terraform-module-aws-iam-user-groups"
 }
 
 inputs = {
-  org = {
-    organization_name = "acme"
-    organization_unit = "platform"
-    environment_type  = "prod"
-    environment_name  = "main"
-  }
-
-  spoke_def = "001"
   is_hub    = false
+  org       = local.env_vars.org
+  spoke_def = local.spoke_vars.spoke
 
-  extra_tags = {
-    Project = "IAM-Management"
-  }
+  secrets_manager_store = try(local.local_vars.secrets_manager_store, false)
+  default_pgp_key       = try(local.local_vars.default_pgp_key, "")
+  access_key_rotation   = try(local.local_vars.access_key_rotation, {})
+  users                 = try(local.local_vars.users, [])
+  groups                = try(local.local_vars.groups, [])
+  policies              = try(local.local_vars.policies, [])
 
-  secrets_manager_store = true
-  default_pgp_key       = "_aws:prod/shared/pgp/public"
-
-  policies = [
-    {
-      name = "S3ReadOnly"
-      statements = [
-        {
-          effect    = "Allow"
-          actions   = ["s3:Get*", "s3:List*"]
-          resources = ["*"]
-        }
-      ]
-    }
-  ]
-
-  groups = [
-    {
-      name        = "developers"
-      policy_refs = ["S3ReadOnly"]
-    }
-  ]
-
-  users = [
-    {
-      name   = "john.doe"
-      groups = ["developers"]
-      console_access = {
-        enabled = true
-      }
-    }
-  ]
+  extra_tags = local.tags
 }
 ```
 
-### Variables Documentation (YAML Format)
-```yaml
-# Organization definition
-org:
-  organization_name: "acme" # (Required) Name of the organization
-  organization_unit: "platform" # (Required) Name of the organizational unit
-  environment_type: "prod" # (Required) Type of environment (e.g., prod, dev, staging)
-  environment_name: "main" # (Required) Name of the environment
+## Access key rotation operating model
 
-# Spoke definition
-spoke_def: "001" # (Optional) Spoke definition identifier. Default: "001"
+Rotation is disabled by default. When `access_key_rotation.enabled = true`, the module configures AWS Secrets Manager rotation for selected users. Secrets Manager invokes the rotation Lambda according to the configured rotation rules and calls the standard create, set, test, and finish rotation steps.
 
-# Hub/Spoke configuration
-is_hub: false # (Optional) Establish if this is a HUB or spoke configuration. Default: false
+The module-created Lambda:
 
-# Extra tags
-extra_tags: {} # (Optional) Additional tags to be applied to all resources. Default: {}
+- Creates a replacement IAM access key for the selected user when rotation is due.
+- Writes the replacement key material directly to that user's Secrets Manager secret.
+- Uses the resolved PGP public key from `default_pgp_key` or the user's `pgp_key` when PGP is configured.
+- Deactivates or deletes older non-current keys during rotation invocations according to `grace_period_days`, `inactive_key_retention_days`, and `delete_inactive_keys`.
 
-# Global settings
-secrets_manager_store: false # (Optional) When true, the module saves generated secrets into AWS Secrets Manager. Default: false
-default_pgp_key: "" # (Optional) Default PGP key used to encrypt sensitive values. Default: ""
+PGP behavior is explicit: if any selected user has `default_pgp_key` or `pgp_key` configured and `create_lambda = true`, `access_key_rotation.lambda_layer_arns` must include a Lambda layer that provides the `pgpy` Python package. Without PGP, no extra layer is required.
 
-# Users configuration
-users:
-  - name: "username" # (Required) IAM user name
-    path: "/" # (Optional) IAM path (e.g., "/service/"). Default: "/"
-    pgp_key: "armored_pgp_key" # (Optional) PGP key for this user. Default: ""
-    groups: ["group1"] # (Optional) List of groups the user belongs to. Default: []
-    access_keys: # (Optional) List of access keys to create. Default: []
-      - name: "key1" # (Required) Logical name for the key
-        status: "Active" # (Optional) Status of the key. Possible values: "Active", "Inactive". Default: "Active"
-    console_access: # (Optional) AWS Console access configuration. Default: null
-      enabled: true # (Required) When true, create login profile
-      password_length: 20 # (Optional) Password length. Default: 20
-      password_reset_required: true # (Optional) Whether password reset is required. Default: true
-    code_commit: # (Optional) AWS CodeCommit credentials. Default: null
-      http_credentials: true # (Optional) Create HTTP credentials. Default: false
-      ssh_credentials: true # (Optional) Create SSH credentials. Default: false
+Scope precedence is deterministic:
 
-# Groups configuration
-groups:
-  - name: "groupname" # (Optional) Named group (explicit name). Either name or name_prefix is REQUIRED.
-    path: "/" # (Optional) IAM path. Default: "/"
-    existing: false # (Optional) If true, reference existing IAM group by name. Default: false
-    policy_attachments: ["arn:aws:iam::aws:policy/ReadOnlyAccess"] # (Optional) Attach existing AWS managed policies by ARN. Default: []
-    policy_refs: ["policy1"] # (Optional) Attach policies created by this module via var.policies. Default: []
-    inline_policies: # (Optional) Inline policies to create and attach to this group. Default: []
-      - name: "inline-policy" # (Required) Name of the inline policy
-        statements: # (Required) List of policy statements
-          - sid: "sid1" # (Optional) Statement ID
-            effect: "Allow" # (Required) Effect. Possible values: "Allow", "Deny"
-            actions: ["s3:ListBucket"] # (Required) List of actions
-            resources: ["arn:aws:s3:::bucket-name"] # (Required) List of resources
-            conditions: # (Optional) List of conditions. Default: []
-              - test: "StringEquals" # (Required) Condition test
-                variable: "aws:PrincipalTag/Department" # (Required) Condition variable
-                values: ["IT"] # (Required) Condition values
+1. If `access_key_rotation.users` is non-empty, those module-managed users are selected.
+2. Otherwise, if `access_key_rotation.groups` is non-empty, users are derived from matching `users[*].groups` entries.
+3. Otherwise, all module-managed users are selected.
+4. `access_key_rotation.exclude_users` and `users[*].access_key_rotation_enabled = false` remove users from any of the above scopes.
 
-# Policies configuration
-policies:
-  - name: "policyname" # (Optional) Named policy. Either name or name_prefix is REQUIRED.
-    statements: # (Required) List of policy statements
-      - sid: "sid1" # (Optional) Statement ID
-        effect: "Allow" # (Required) Effect. Possible values: "Allow", "Deny"
-        actions: ["s3:ListBucket"] # (Required) List of actions
-        resources: ["arn:aws:s3:::bucket-name"] # (Required) List of resources
-```
+Secret values are never output by Terraform. Replacement key material is written by the Lambda directly to Secrets Manager. For users under rotation, the module intentionally skips Terraform-managed `users[*].access_keys` so `aws_iam_access_key` is not recreated after the rotation Lambda changes the IAM key set. Users that opt out of rotation keep the previous Terraform-managed access key behavior for backwards compatibility.
+
+Each configured user's Secrets Manager rotation schedule and Lambda association are maintained by `aws_secretsmanager_secret_rotation.access_key_rotation`; the per-user secret resource only creates or references the destination secret.
 
 ## Quick Start
 
-1.  **Install Terragrunt**: Ensure you have Terragrunt and Terraform installed.
-2.  **Create `terragrunt.hcl`**: Use the example above to create your configuration.
-3.  **Configure AWS Credentials**: Set up your AWS environment variables or profile.
-4.  **Initialize and Apply**:
-    ```bash
-    terragrunt init
-    terragrunt apply
-    ```
-5.  **Verify**: Check the AWS Console for the created users, groups, and policies. If `secrets_manager_store` was enabled, find the credentials in AWS Secrets Manager.
+1. Create the target deployment directory and run `terragrunt scaffold github.com/cloudopsworks/terraform-module-aws-iam-user-groups` from inside it.
+2. Edit the generated `inputs.yaml` with users, groups, policies, and optional rotation settings.
+3. Keep `access_key_rotation.enabled = false` unless the deployment is ready for operational key rotation through AWS Secrets Manager rotation.
+4. If PGP is configured for selected users and `create_lambda = true`, provide `access_key_rotation.lambda_layer_arns` with a Lambda layer containing `pgpy`.
+5. Set `users[*].access_key_rotation_enabled = false` for any selected user that must keep Terraform-managed access keys.
+6. Run `terragrunt plan` and review created IAM users, groups, policies, secret destinations, Lambda resources, and Secrets Manager rotation configuration.
+7. Run `terragrunt apply`.
+8. If rotation is enabled, inspect the `access_key_rotation` output for Lambda/rotation metadata and read replacement secrets from Secrets Manager, not Terraform outputs.
 
 
 ## Examples
 
-### Full Terragrunt Example
-```hcl
-include "root" {
-  path = find_in_parent_folders()
-}
+## Basic IAM users, groups, and policies
 
-terraform {
-  source = "git::https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups.git?ref=v1.0.0"
-}
+```yaml
+secrets_manager_store: true
+default_pgp_key: "_aws:shared/security/pgp/public"
 
-inputs = {
-  org = {
-    organization_name = "cloudopsworks"
-    organization_unit = "operations"
-    environment_type  = "prod"
-    environment_name  = "shared"
-  }
+policies:
+  - name: "S3ReadOnly"
+    statements:
+      - effect: "Allow"
+        actions: ["s3:Get*", "s3:List*"]
+        resources: ["*"]
 
-  secrets_manager_store = true
+groups:
+  - name: "developers"
+    policy_refs: ["S3ReadOnly"]
 
-  policies = [
-    {
-      name = "AdministratorAccessCustom"
-      statements = [
-        {
-          effect    = "Allow"
-          actions   = ["*"]
-          resources = ["*"]
-        }
-      ]
-    }
-  ]
+users:
+  - name: "john.doe"
+    path: "/team/"
+    groups: ["developers"]
+    console_access:
+      enabled: true
+      password_length: 24
+      password_reset_required: true
+```
 
-  groups = [
-    {
-      name        = "admins"
-      policy_refs = ["AdministratorAccessCustom"]
-    }
-  ]
+## Enable Secrets Manager rotation for a group-derived scope
 
-  users = [
-    {
-      name   = "admin.user"
-      groups = ["admins"]
-      console_access = {
-        enabled = true
-        password_reset_required = true
-      }
-      access_keys = [
-        {
-          name = "primary"
-        }
-      ]
-    }
-  ]
-}
+```yaml
+access_key_rotation:
+  enabled: true
+  create_lambda: true
+  automatically_after_days: 90
+  rotate_after_days: 90
+  grace_period_days: 7
+  inactive_key_retention_days: 30
+  delete_inactive_keys: false
+  groups: ["automation"]
+  create_secrets: true
+
+groups:
+  - name: "automation"
+    policy_attachments:
+      - "arn:aws:iam::aws:policy/ReadOnlyAccess"
+
+users:
+  - name: "ci.bot"
+    groups: ["automation"]
+  - name: "breakglass.user"
+    groups: ["automation"]
+    access_key_rotation_enabled: false
+```
+
+## Enable rotation when PGP is active
+
+```yaml
+default_pgp_key: "_aws:shared/security/pgp/public"
+
+access_key_rotation:
+  enabled: true
+  create_lambda: true
+  lambda_layer_arns:
+    - "arn:aws:lambda:us-east-1:123456789012:layer:python-pgpy:1"
+  users: ["ci.bot"]
+```
+
+## Use pre-created Secrets Manager destinations
+
+```yaml
+access_key_rotation:
+  enabled: true
+  users: ["ci.bot"]
+  create_secrets: false
+  secret_arns:
+    ci.bot: "arn:aws:secretsmanager:us-east-1:123456789012:secret:iam/ci-bot-AbCdEf"
 ```
 
 
@@ -277,14 +341,16 @@ Available targets:
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.4 |
+| <a name="requirement_archive"></a> [archive](#requirement\_archive) | ~> 2.7 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.35 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.4 |
-| <a name="provider_tls"></a> [tls](#provider\_tls) | n/a |
+| <a name="provider_archive"></a> [archive](#provider\_archive) | 2.8.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.51.0 |
+| <a name="provider_tls"></a> [tls](#provider\_tls) | 4.3.0 |
 
 ## Modules
 
@@ -296,6 +362,7 @@ Available targets:
 
 | Name | Type |
 |------|------|
+| [aws_cloudwatch_log_group.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
 | [aws_iam_access_key.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_access_key) | resource |
 | [aws_iam_group.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group) | resource |
 | [aws_iam_group.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group) | resource |
@@ -307,48 +374,72 @@ Available targets:
 | [aws_iam_group_policy_attachment.prefixed_refs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group_policy_attachment) | resource |
 | [aws_iam_policy.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_policy.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
+| [aws_iam_role.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_service_specific_credential.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_service_specific_credential) | resource |
 | [aws_iam_user.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user) | resource |
 | [aws_iam_user_group_membership.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_group_membership) | resource |
 | [aws_iam_user_login_profile.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_login_profile) | resource |
 | [aws_iam_user_ssh_key.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_ssh_key) | resource |
+| [aws_lambda_function.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
+| [aws_lambda_permission.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission) | resource |
+| [aws_secretsmanager_secret.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.access_key_rotation_config](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.user_login](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.user_secret](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_rotation.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_rotation) | resource |
+| [aws_secretsmanager_secret_version.access_key_rotation_config](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.user_login](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.user_secret](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [tls_private_key.this](https://registry.terraform.io/providers/hashicorp/tls/latest/docs/resources/private_key) | resource |
+| [archive_file.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
+| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_iam_group.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_group) | data source |
 | [aws_iam_policy.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy) | data source |
 | [aws_iam_policy.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy) | data source |
+| [aws_iam_policy_document.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_iam_policy_document.access_key_rotation_lambda_assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.named_inline](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.prefixed_inline](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 | [aws_secretsmanager_secret_version.pgp_public_key](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.user_pgp_public_key](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_access_key_rotation"></a> [access\_key\_rotation](#input\_access\_key\_rotation) | Optional AWS Secrets Manager IAM access key rotation control plane. Disabled by default. See comments above for full schema. | `any` | `{}` | no |
 | <a name="input_default_pgp_key"></a> [default\_pgp\_key](#input\_default\_pgp\_key) | Default PGP key for encrypting secrets. Accepts raw armored PGP or "\_aws:<secret\_id>" to load it from AWS Secrets Manager. | `string` | `""` | no |
-| <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | n/a | `map(string)` | `{}` | no |
+| <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | Extra tags to add to the resources | `map(string)` | `{}` | no |
 | <a name="input_groups"></a> [groups](#input\_groups) | List of IAM groups (named or prefixed). See comments above for full schema. | `any` | `[]` | no |
-| <a name="input_is_hub"></a> [is\_hub](#input\_is\_hub) | Establish this is a HUB or spoke configuration | `bool` | `false` | no |
-| <a name="input_org"></a> [org](#input\_org) | n/a | <pre>object({<br/>    organization_name = string<br/>    organization_unit = string<br/>    environment_type  = string<br/>    environment_name  = string<br/>  })</pre> | n/a | yes |
+| <a name="input_is_hub"></a> [is\_hub](#input\_is\_hub) | Is this a hub or spoke configuration? | `bool` | `false` | no |
+| <a name="input_org"></a> [org](#input\_org) | Organization details | <pre>object({<br/>    organization_name = string<br/>    organization_unit = string<br/>    environment_type  = string<br/>    environment_name  = string<br/>  })</pre> | n/a | yes |
 | <a name="input_policies"></a> [policies](#input\_policies) | List of IAM policies (named or prefixed). See comments above for full schema and example. | `any` | `[]` | no |
 | <a name="input_secrets_manager_store"></a> [secrets\_manager\_store](#input\_secrets\_manager\_store) | Save secrets to the AWS Secrets Manager Store | `bool` | `false` | no |
-| <a name="input_spoke_def"></a> [spoke\_def](#input\_spoke\_def) | n/a | `string` | `"001"` | no |
+| <a name="input_spoke_def"></a> [spoke\_def](#input\_spoke\_def) | Spoke ID Number, must be a 3 digit number | `string` | `"001"` | no |
 | <a name="input_users"></a> [users](#input\_users) | List of IAM users (see comments above for full schema). | `any` | `[]` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_groups"></a> [groups](#output\_groups) | n/a |
-| <a name="output_iam_access_keys"></a> [iam\_access\_keys](#output\_iam\_access\_keys) | n/a |
-| <a name="output_policies"></a> [policies](#output\_policies) | n/a |
-| <a name="output_users"></a> [users](#output\_users) | n/a |
+| <a name="output_access_key_rotation"></a> [access\_key\_rotation](#output\_access\_key\_rotation) | Non-secret metadata for the optional AWS Secrets Manager IAM access key rotation control plane. Secret values are not included. |
+| <a name="output_group_inline_policies"></a> [group\_inline\_policies](#output\_group\_inline\_policies) | Resolved IAM group inline policies keyed by module logical attachment name. |
+| <a name="output_group_policy_attachments"></a> [group\_policy\_attachments](#output\_group\_policy\_attachments) | Resolved IAM group managed-policy attachments, including external policy ARNs and module policy references. |
+| <a name="output_groups"></a> [groups](#output\_groups) | IAM group metadata for managed and referenced groups. Secret values are not included. |
+| <a name="output_groups_by_name"></a> [groups\_by\_name](#output\_groups\_by\_name) | IAM group metadata keyed by IAM group name for downstream module lookups. Secret values are not included. |
+| <a name="output_iam_access_key_metadata"></a> [iam\_access\_key\_metadata](#output\_iam\_access\_key\_metadata) | Non-secret IAM access key metadata keyed by logical key name. Secret access key values are not included. |
+| <a name="output_iam_access_keys"></a> [iam\_access\_keys](#output\_iam\_access\_keys) | Compatibility output for IAM access key metadata only; secret access key values are not included. Marked sensitive to preserve the historical output contract. |
+| <a name="output_policies"></a> [policies](#output\_policies) | IAM managed policy metadata created by this module. |
+| <a name="output_policies_by_name"></a> [policies\_by\_name](#output\_policies\_by\_name) | IAM managed policy metadata keyed by policy name for downstream module lookups. |
+| <a name="output_secrets_manager_secret_refs"></a> [secrets\_manager\_secret\_refs](#output\_secrets\_manager\_secret\_refs) | Secrets Manager secret references created by this module for console credentials and Terraform-managed access keys. Secret values are not included. |
+| <a name="output_user_group_memberships"></a> [user\_group\_memberships](#output\_user\_group\_memberships) | Resolved IAM group memberships keyed by IAM user name. |
+| <a name="output_users"></a> [users](#output\_users) | IAM user metadata created by this module. Secret values are not included. |
+| <a name="output_users_by_name"></a> [users\_by\_name](#output\_users\_by\_name) | IAM user metadata keyed by IAM user name for downstream module lookups. Secret values are not included. |
 
 
 
@@ -458,9 +549,9 @@ This project is maintained by [Cloud Ops Works LLC][website].
   [readme_footer_link]: https://cloudopsworks.co/readme/footer/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-iam-user-groups&utm_content=readme_footer_link
   [readme_commercial_support_img]: https://cloudopsworks.co/readme/commercial-support/img
   [readme_commercial_support_link]: https://cloudopsworks.co/readme/commercial-support/link?utm_source=github&utm_medium=readme&utm_campaign=cloudopsworks/terraform-module-aws-iam-user-groups&utm_content=readme_commercial_support_link
-  [share_twitter]: https://x.com/intent/tweet/?text=AWS+IAM+Users,+Groups,+and+Policies+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
-  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=AWS+IAM+Users,+Groups,+and+Policies+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+  [share_twitter]: https://x.com/intent/tweet/?text=AWS+IAM+Users,+Groups,+Policies,+and+Access+Key+Rotation+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+  [share_linkedin]: https://www.linkedin.com/shareArticle?mini=true&title=AWS+IAM+Users,+Groups,+Policies,+and+Access+Key+Rotation+Module&url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [share_reddit]: https://reddit.com/submit/?url=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [share_facebook]: https://facebook.com/sharer/sharer.php?u=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
-  [share_email]: mailto:?subject=AWS+IAM+Users,+Groups,+and+Policies+Module&body=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
+  [share_email]: mailto:?subject=AWS+IAM+Users,+Groups,+Policies,+and+Access+Key+Rotation+Module&body=https://github.com/cloudopsworks/terraform-module-aws-iam-user-groups
   [beacon]: https://ga-beacon.cloudopsworks.co/G-QMZVYYN2VN/cloudopsworks/terraform-module-aws-iam-user-groups?pixel&cs=github&cm=readme&an=terraform-module-aws-iam-user-groups
