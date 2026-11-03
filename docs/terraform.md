@@ -76,15 +76,7 @@
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_group_inline_policies"></a> [group\_inline\_policies](#output\_group\_inline\_policies) | Resolved IAM group inline policies keyed by module logical attachment name. |
-| <a name="output_group_policy_attachments"></a> [group\_policy\_attachments](#output\_group\_policy\_attachments) | Resolved IAM group managed-policy attachments, including external policy ARNs and module policy references. |
-| <a name="output_groups"></a> [groups](#output\_groups) | IAM group metadata for managed and referenced groups. Secret values are not included. |
-| <a name="output_groups_by_name"></a> [groups\_by\_name](#output\_groups\_by\_name) | IAM group metadata keyed by IAM group name for downstream module lookups. Secret values are not included. |
-| <a name="output_iam_access_key_metadata"></a> [iam\_access\_key\_metadata](#output\_iam\_access\_key\_metadata) | Non-secret IAM access key metadata keyed by logical key name, including the key duration and the expiry after which the next Terraform run replaces the key. Secret access key values are not included. |
-| <a name="output_iam_access_keys"></a> [iam\_access\_keys](#output\_iam\_access\_keys) | Compatibility output for IAM access key metadata only; secret access key values are not included. Marked sensitive to preserve the historical output contract. |
-| <a name="output_policies"></a> [policies](#output\_policies) | IAM managed policy metadata created by this module. |
-| <a name="output_policies_by_name"></a> [policies\_by\_name](#output\_policies\_by\_name) | IAM managed policy metadata keyed by policy name for downstream module lookups. |
-| <a name="output_secrets_manager_secret_refs"></a> [secrets\_manager\_secret\_refs](#output\_secrets\_manager\_secret\_refs) | Secrets Manager secret references created by this module for console credentials and Terraform-managed access keys. Secret values are not included. |
-| <a name="output_user_group_memberships"></a> [user\_group\_memberships](#output\_user\_group\_memberships) | Resolved IAM group memberships keyed by IAM user name. |
-| <a name="output_users"></a> [users](#output\_users) | IAM user metadata created by this module. Secret values are not included. |
-| <a name="output_users_by_name"></a> [users\_by\_name](#output\_users\_by\_name) | IAM user metadata keyed by IAM user name for downstream module lookups. Secret values are not included. |
+| <a name="output_access_keys"></a> [access\_keys](#output\_access\_keys) | Terraform-managed IAM access keys keyed by "<user>-<key name>": key ID, status, duration and expiry (the next Terraform run after expires\_at replaces the key), and the Secrets Manager secret ARN holding the key (null when not stored). Secret values are not included. |
+| <a name="output_groups"></a> [groups](#output\_groups) | IAM groups (created or referenced with existing = true) keyed by IAM group name, with their attached managed policy ARNs and inline policy names. |
+| <a name="output_policies"></a> [policies](#output\_policies) | IAM managed policies created by this module, keyed by policy name. |
+| <a name="output_users"></a> [users](#output\_users) | IAM users keyed by user name, with their group memberships and the Secrets Manager secret ARN holding the console password (null when not stored). Secret values are not included. |

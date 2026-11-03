@@ -7,246 +7,75 @@
 #     Distributed Under Apache v2.0 License
 #
 
-output "users" {
-  description = "IAM user metadata created by this module. Secret values are not included."
-  value = [
-    for user in aws_iam_user.this : {
-      name      = user.name
-      arn       = user.arn
-      path      = user.path
-      unique_id = user.unique_id
-    }
-  ]
+locals {
+  # Every managed-policy attachment (external ARNs and module policies) as {group, policy_arn}.
+  output_group_policy_attachments = concat(
+    values(aws_iam_group_policy_attachment.named),
+    values(aws_iam_group_policy_attachment.prefixed),
+    values(aws_iam_group_policy_attachment.named_refs),
+    values(aws_iam_group_policy_attachment.prefixed_refs),
+  )
+  output_group_inline_policies = concat(
+    values(aws_iam_group_policy.named_inline),
+    values(aws_iam_group_policy.prefixed_inline),
+  )
+  # Created and referenced (existing) groups, keyed by the real IAM group name.
+  output_groups = merge(
+    { for g in aws_iam_group.named : g.name => { arn = g.arn, path = g.path, unique_id = g.unique_id, existing = false } },
+    { for g in aws_iam_group.prefixed : g.name => { arn = g.arn, path = g.path, unique_id = g.unique_id, existing = false } },
+    { for g in data.aws_iam_group.named : g.group_name => { arn = g.arn, path = g.path, unique_id = g.group_id, existing = true } },
+  )
 }
 
-output "users_by_name" {
-  description = "IAM user metadata keyed by IAM user name for downstream module lookups. Secret values are not included."
+output "users" {
+  description = "IAM users keyed by user name, with their group memberships and the Secrets Manager secret ARN holding the console password (null when not stored). Secret values are not included."
   value = {
-    for user in aws_iam_user.this : user.name => {
-      name      = user.name
-      arn       = user.arn
-      path      = user.path
-      unique_id = user.unique_id
+    for name, user in aws_iam_user.this : name => {
+      name                        = user.name
+      arn                         = user.arn
+      path                        = user.path
+      unique_id                   = user.unique_id
+      groups                      = sort(tolist(aws_iam_user_group_membership.this[name].groups))
+      console_password_secret_arn = try(aws_secretsmanager_secret.user_login[name].arn, null)
     }
   }
 }
 
 output "groups" {
-  description = "IAM group metadata for managed and referenced groups. Secret values are not included."
-  value = concat([
-    for group in aws_iam_group.named : {
-      name      = group.name
-      arn       = group.arn
-      path      = group.path
-      unique_id = group.unique_id
-      existing  = false
-      kind      = "named"
-    }
-    ], [
-    for group in data.aws_iam_group.named : {
-      name      = group.group_name
-      arn       = group.arn
-      path      = group.path
-      unique_id = try(group.unique_id, group.group_id, group.id)
-      existing  = true
-      kind      = "named"
-    }
-    ], [
-    for group in aws_iam_group.prefixed : {
-      name      = group.name
-      arn       = group.arn
-      path      = group.path
-      unique_id = group.unique_id
-      existing  = false
-      kind      = "prefixed"
-    }
-  ])
-}
-
-output "groups_by_name" {
-  description = "IAM group metadata keyed by IAM group name for downstream module lookups. Secret values are not included."
-  value = merge({
-    for group in aws_iam_group.named : group.name => {
-      name      = group.name
-      arn       = group.arn
-      path      = group.path
-      unique_id = group.unique_id
-      existing  = false
-      kind      = "named"
-    }
-    }, {
-    for group in data.aws_iam_group.named : group.group_name => {
-      name      = group.group_name
-      arn       = group.arn
-      path      = group.path
-      unique_id = try(group.unique_id, group.group_id, group.id)
-      existing  = true
-      kind      = "named"
-    }
-    }, {
-    for group in aws_iam_group.prefixed : group.name => {
-      name      = group.name
-      arn       = group.arn
-      path      = group.path
-      unique_id = group.unique_id
-      existing  = false
-      kind      = "prefixed"
-    }
-  })
-}
-
-output "user_group_memberships" {
-  description = "Resolved IAM group memberships keyed by IAM user name."
+  description = "IAM groups (created or referenced with existing = true) keyed by IAM group name, with their attached managed policy ARNs and inline policy names."
   value = {
-    for user_name, membership in aws_iam_user_group_membership.this : user_name => {
-      user   = membership.user
-      groups = membership.groups
-    }
-  }
-}
-
-output "iam_access_keys" {
-  description = "Compatibility output for IAM access key metadata only; secret access key values are not included. Marked sensitive to preserve the historical output contract."
-  value = [
-    for key_name, key in aws_iam_access_key.this : {
-      key_name    = key_name
-      id          = key.id
-      user_name   = key.user
-      create_date = key.create_date
-      status      = key.status
-    }
-  ]
-  sensitive = true
-}
-
-output "iam_access_key_metadata" {
-  description = "Non-secret IAM access key metadata keyed by logical key name, including the key duration and the expiry after which the next Terraform run replaces the key. Secret access key values are not included."
-  value = {
-    for key_name, key in aws_iam_access_key.this : key_name => {
-      key_name      = key_name
-      id            = key.id
-      user_name     = key.user
-      create_date   = key.create_date
-      status        = key.status
-      duration_days = local.user_access_keys[key_name].duration_days
-      expires_at    = time_rotating.access_key[key_name].rotation_rfc3339
-    }
+    for name, group in local.output_groups : name => merge(group, {
+      name            = name
+      policy_arns     = sort(distinct([for a in local.output_group_policy_attachments : a.policy_arn if a.group == name]))
+      inline_policies = sort([for p in local.output_group_inline_policies : p.name if p.group == name])
+    })
   }
 }
 
 output "policies" {
-  description = "IAM managed policy metadata created by this module."
-  value = concat([
-    for policy in aws_iam_policy.named : {
-      name      = policy.name
-      arn       = policy.arn
-      id        = policy.id
-      policy_id = policy.policy_id
-      path      = policy.path
-      kind      = "named"
-    }
-    ], [
-    for policy in aws_iam_policy.prefixed : {
-      name      = policy.name
-      arn       = policy.arn
-      id        = policy.id
-      policy_id = policy.policy_id
-      path      = policy.path
-      kind      = "prefixed"
-    }
-  ])
-}
-
-output "policies_by_name" {
-  description = "IAM managed policy metadata keyed by policy name for downstream module lookups."
-  value = merge({
-    for policy in aws_iam_policy.named : policy.name => {
-      name      = policy.name
-      arn       = policy.arn
-      id        = policy.id
-      policy_id = policy.policy_id
-      path      = policy.path
-      kind      = "named"
-    }
-    }, {
-    for policy in aws_iam_policy.prefixed : policy.name => {
-      name      = policy.name
-      arn       = policy.arn
-      id        = policy.id
-      policy_id = policy.policy_id
-      path      = policy.path
-      kind      = "prefixed"
-    }
-  })
-}
-
-output "group_policy_attachments" {
-  description = "Resolved IAM group managed-policy attachments, including external policy ARNs and module policy references."
-  value = merge({
-    for key, attachment in aws_iam_group_policy_attachment.named : key => {
-      group      = attachment.group
-      policy_arn = attachment.policy_arn
-      id         = attachment.id
-      kind       = "named_external"
-    }
-    }, {
-    for key, attachment in aws_iam_group_policy_attachment.prefixed : key => {
-      group      = attachment.group
-      policy_arn = attachment.policy_arn
-      id         = attachment.id
-      kind       = "prefixed_external"
-    }
-    }, {
-    for key, attachment in aws_iam_group_policy_attachment.named_refs : key => {
-      group      = attachment.group
-      policy_arn = attachment.policy_arn
-      id         = attachment.id
-      kind       = "named_module_ref"
-    }
-    }, {
-    for key, attachment in aws_iam_group_policy_attachment.prefixed_refs : key => {
-      group      = attachment.group
-      policy_arn = attachment.policy_arn
-      id         = attachment.id
-      kind       = "prefixed_module_ref"
-    }
-  })
-}
-
-output "group_inline_policies" {
-  description = "Resolved IAM group inline policies keyed by module logical attachment name."
-  value = merge({
-    for key, policy in aws_iam_group_policy.named_inline : key => {
-      name  = policy.name
-      group = policy.group
-      id    = policy.id
-      kind  = "named_inline"
-    }
-    }, {
-    for key, policy in aws_iam_group_policy.prefixed_inline : key => {
-      name  = policy.name
-      group = policy.group
-      id    = policy.id
-      kind  = "prefixed_inline"
-    }
-  })
-}
-
-output "secrets_manager_secret_refs" {
-  description = "Secrets Manager secret references created by this module for console credentials and Terraform-managed access keys. Secret values are not included."
+  description = "IAM managed policies created by this module, keyed by policy name."
   value = {
-    console_passwords = {
-      for user_name, secret in aws_secretsmanager_secret.user_login : user_name => {
-        name = secret.name
-        arn  = secret.arn
-      }
+    for policy in concat(values(aws_iam_policy.named), values(aws_iam_policy.prefixed)) : policy.name => {
+      name      = policy.name
+      arn       = policy.arn
+      path      = policy.path
+      policy_id = policy.policy_id
     }
-    access_keys = {
-      for key_name, secret in aws_secretsmanager_secret.user_secret : key_name => {
-        name      = secret.name
-        arn       = secret.arn
-        user_name = local.user_access_keys[key_name].user_name
-      }
+  }
+}
+
+output "access_keys" {
+  description = "Terraform-managed IAM access keys keyed by \"<user>-<key name>\": key ID, status, duration and expiry (the next Terraform run after expires_at replaces the key), and the Secrets Manager secret ARN holding the key (null when not stored). Secret values are not included."
+  value = {
+    for key_name, key in aws_iam_access_key.this : key_name => {
+      user_name     = key.user
+      key_name      = local.user_access_keys[key_name].key_name
+      id            = key.id
+      status        = key.status
+      create_date   = key.create_date
+      duration_days = local.user_access_keys[key_name].duration_days
+      expires_at    = time_rotating.access_key[key_name].rotation_rfc3339
+      secret_arn    = try(aws_secretsmanager_secret.user_secret[key_name].arn, null)
     }
   }
 }
