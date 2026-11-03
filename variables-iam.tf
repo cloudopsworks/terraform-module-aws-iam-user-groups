@@ -74,6 +74,7 @@ variable "access_key_rotation" {
 #     access_keys: # (Optional) Access keys to create for this user. Default: []
 #       - name: "key1" # (Required) Logical name for the key (used internally)
 #         status: "Active" # (Optional) Status of the key. Possible values: "Active", "Inactive". Default: "Active"
+#         duration_days: 90 # (Optional) Maximum key lifetime in days. Once expired, the next Terraform run replaces the key (and its Secrets Manager secret when secrets_manager_store is true). Whole number between 15 and 365. Default: 90
 #     console_access: # (Optional) AWS Console access configuration. Default: null
 #       enabled: true # (Required) When true, create login profile (password)
 #       password_length: 20 # (Optional) Default: 20
@@ -86,6 +87,16 @@ variable "users" {
   description = "List of IAM users (see comments above for full schema)."
   type        = any
   default     = []
+
+  validation {
+    condition = alltrue(flatten([
+      for user in var.users : [
+        for key in try(user.access_keys, []) :
+        try(key.duration_days, 90) >= 15 && try(key.duration_days, 90) <= 365 && floor(try(key.duration_days, 90)) == try(key.duration_days, 90)
+      ]
+    ]))
+    error_message = "users[*].access_keys[*].duration_days must be a whole number of days between 15 and 365."
+  }
 }
 
 # ----------------------------------------------------------------------------

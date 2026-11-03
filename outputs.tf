@@ -120,14 +120,16 @@ output "iam_access_keys" {
 }
 
 output "iam_access_key_metadata" {
-  description = "Non-secret IAM access key metadata keyed by logical key name. Secret access key values are not included."
+  description = "Non-secret IAM access key metadata keyed by logical key name, including the key duration and the expiry after which the next Terraform run replaces the key. Secret access key values are not included."
   value = {
     for key_name, key in aws_iam_access_key.this : key_name => {
-      key_name    = key_name
-      id          = key.id
-      user_name   = key.user
-      create_date = key.create_date
-      status      = key.status
+      key_name      = key_name
+      id            = key.id
+      user_name     = key.user
+      create_date   = key.create_date
+      status        = key.status
+      duration_days = local.user_access_keys[key_name].duration_days
+      expires_at    = time_rotating.access_key[key_name].rotation_rfc3339
     }
   }
 }

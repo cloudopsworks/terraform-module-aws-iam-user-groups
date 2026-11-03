@@ -100,7 +100,10 @@ usage: |-
   #     pgp_key: "" # (Optional) User-specific PGP key; use raw armored PGP or "_aws:<secret_id>". Default: ""
   #     access_key_rotation_enabled: true # (Optional) Set false to opt this user out of module-level access_key_rotation selection. Default: true
   #     groups: ["developers"] # (Optional) Group memberships; use group.name for named groups or group.name_prefix for prefixed groups. Default: []
-  #     access_keys: [] # (Optional) Terraform-managed access keys. Skipped automatically while this user is managed by access_key_rotation to avoid aws_iam_access_key recreation. Default: []
+  #     access_keys: # (Optional) Terraform-managed access keys. Skipped automatically while this user is managed by access_key_rotation to avoid aws_iam_access_key recreation. Default: []
+  #       - name: "key1" # (Required) Logical key name, used internally.
+  #         status: "Active" # (Optional) Key status. Valid values: "Active", "Inactive". Default: "Active"
+  #         duration_days: 90 # (Optional) Maximum key lifetime in days; once expired, the next Terraform run replaces the key and its Secrets Manager secret. Whole number between 15 and 365. Default: 90
   #     console_access: null # (Optional) Console login profile configuration. Default: null
   #     code_commit: null # (Optional) CodeCommit HTTP/SSH credential configuration. Default: null
 
@@ -200,6 +203,18 @@ usage: |-
   Secret values are never output by Terraform. Replacement key material is written by the Lambda directly to Secrets Manager. For users under rotation, the module intentionally skips Terraform-managed `users[*].access_keys` so `aws_iam_access_key` is not recreated after the rotation Lambda changes the IAM key set. Users that opt out of rotation keep the previous Terraform-managed access key behavior for backwards compatibility.
 
   Each configured user's Secrets Manager rotation schedule and Lambda association are maintained by `aws_secretsmanager_secret_rotation.access_key_rotation`; the per-user secret resource only creates or references the destination secret.
+
+  ## Access key duration (Terraform-managed keys)
+
+  Terraform-managed keys (`users[*].access_keys`) have a maximum lifetime set by `duration_days` (default `90`, allowed `15`–`365`). Each key is paired with a `time_rotating` timer. After the timer expires, the next `terragrunt plan`/`apply` replaces the key and, when `secrets_manager_store = true`, writes the new key into the user's Secrets Manager secret. Nothing rotates between runs, so schedule regular applies to keep keys within their duration.
+
+  | Behavior | Detail |
+  |----------|--------|
+  | Default duration | 90 days |
+  | Allowed range | 15–365 days (whole numbers) |
+  | When rotation happens | The first Terraform run after the duration has elapsed |
+  | Expiry visibility | `iam_access_key_metadata[*].expires_at` |
+  | Existing keys after upgrade | The timer starts on the first apply with this version; existing keys are not replaced immediately |
 
 examples: |-
   ## Basic IAM users, groups, and policies

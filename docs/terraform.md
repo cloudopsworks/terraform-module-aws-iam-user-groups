@@ -1,29 +1,31 @@
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
 | <a name="requirement_archive"></a> [archive](#requirement\_archive) | ~> 2.7 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.35 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.13 |
 
 ## Providers
 
 | Name | Version |
-|------|---------|
-| <a name="provider_archive"></a> [archive](#provider\_archive) | ~> 2.7 |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.35 |
-| <a name="provider_tls"></a> [tls](#provider\_tls) | n/a |
+| ---- | ------- |
+| <a name="provider_archive"></a> [archive](#provider\_archive) | 2.8.1 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.71.0 |
+| <a name="provider_time"></a> [time](#provider\_time) | 0.14.2 |
+| <a name="provider_tls"></a> [tls](#provider\_tls) | 4.4.2 |
 
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
-| <a name="module_tags"></a> [tags](#module\_tags) | cloudopsworks/tags/local | 1.0.9 |
+| ---- | ------ | ------- |
+| <a name="module_tags"></a> [tags](#module\_tags) | cloudopsworks/tags/local | 1.0.10 |
 
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [aws_cloudwatch_log_group.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
 | [aws_iam_access_key.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_access_key) | resource |
 | [aws_iam_group.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group) | resource |
@@ -53,6 +55,8 @@
 | [aws_secretsmanager_secret_version.access_key_rotation_config](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.user_login](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.user_secret](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [time_rotating.access_key](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/rotating) | resource |
+| [time_static.access_key](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/static) | resource |
 | [tls_private_key.this](https://registry.terraform.io/providers/hashicorp/tls/latest/docs/resources/private_key) | resource |
 | [archive_file.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
@@ -73,7 +77,7 @@
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_access_key_rotation"></a> [access\_key\_rotation](#input\_access\_key\_rotation) | Optional AWS Secrets Manager IAM access key rotation control plane. Disabled by default. See comments above for full schema. | `any` | `{}` | no |
 | <a name="input_default_pgp_key"></a> [default\_pgp\_key](#input\_default\_pgp\_key) | Default PGP key for encrypting secrets. Accepts raw armored PGP or "\_aws:<secret\_id>" to load it from AWS Secrets Manager. | `string` | `""` | no |
 | <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | Extra tags to add to the resources | `map(string)` | `{}` | no |
@@ -88,13 +92,13 @@
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_access_key_rotation"></a> [access\_key\_rotation](#output\_access\_key\_rotation) | Non-secret metadata for the optional AWS Secrets Manager IAM access key rotation control plane. Secret values are not included. |
 | <a name="output_group_inline_policies"></a> [group\_inline\_policies](#output\_group\_inline\_policies) | Resolved IAM group inline policies keyed by module logical attachment name. |
 | <a name="output_group_policy_attachments"></a> [group\_policy\_attachments](#output\_group\_policy\_attachments) | Resolved IAM group managed-policy attachments, including external policy ARNs and module policy references. |
 | <a name="output_groups"></a> [groups](#output\_groups) | IAM group metadata for managed and referenced groups. Secret values are not included. |
 | <a name="output_groups_by_name"></a> [groups\_by\_name](#output\_groups\_by\_name) | IAM group metadata keyed by IAM group name for downstream module lookups. Secret values are not included. |
-| <a name="output_iam_access_key_metadata"></a> [iam\_access\_key\_metadata](#output\_iam\_access\_key\_metadata) | Non-secret IAM access key metadata keyed by logical key name. Secret access key values are not included. |
+| <a name="output_iam_access_key_metadata"></a> [iam\_access\_key\_metadata](#output\_iam\_access\_key\_metadata) | Non-secret IAM access key metadata keyed by logical key name, including the key duration and the expiry after which the next Terraform run replaces the key. Secret access key values are not included. |
 | <a name="output_iam_access_keys"></a> [iam\_access\_keys](#output\_iam\_access\_keys) | Compatibility output for IAM access key metadata only; secret access key values are not included. Marked sensitive to preserve the historical output contract. |
 | <a name="output_policies"></a> [policies](#output\_policies) | IAM managed policy metadata created by this module. |
 | <a name="output_policies_by_name"></a> [policies\_by\_name](#output\_policies\_by\_name) | IAM managed policy metadata keyed by policy name for downstream module lookups. |

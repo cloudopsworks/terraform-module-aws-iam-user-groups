@@ -39,7 +39,10 @@ users: [] # (Optional) IAM users managed by this module. Default: []
 #     pgp_key: "" # (Optional) User-specific PGP key; use raw armored PGP or "_aws:<secret_id>". Default: ""
 #     access_key_rotation_enabled: true # (Optional) Set false to opt this user out of module-level access_key_rotation selection. Default: true
 #     groups: ["developers"] # (Optional) Group memberships; use group.name for named groups or group.name_prefix for prefixed groups. Default: []
-#     access_keys: [] # (Optional) Terraform-managed access keys. Skipped automatically while this user is managed by access_key_rotation to avoid aws_iam_access_key recreation. Default: []
+#     access_keys: # (Optional) Terraform-managed access keys. Skipped automatically while this user is managed by access_key_rotation to avoid aws_iam_access_key recreation. Default: []
+#       - name: "key1" # (Required) Logical key name, used internally.
+#         status: "Active" # (Optional) Key status. Valid values: "Active", "Inactive". Default: "Active"
+#         duration_days: 90 # (Optional) Maximum key lifetime in days; once expired, the next Terraform run replaces the key and its Secrets Manager secret. Whole number between 15 and 365. Default: 90
 #     console_access: null # (Optional) Console login profile configuration. Default: null
 #     code_commit: null # (Optional) CodeCommit HTTP/SSH credential configuration. Default: null
 

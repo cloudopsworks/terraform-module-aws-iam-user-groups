@@ -1,5 +1,5 @@
 ##
-# (c) 2021-2025
+# (c) 2021-2026
 #     Cloud Ops Works LLC - https://cloudops.works/
 #     Find us on:
 #       GitHub: https://github.com/cloudopsworks
@@ -7,6 +7,9 @@
 #     Distributed Under Apache v2.0 License
 #
 locals {
+  # Maximum lifetime of a Terraform-managed access key before the next run replaces it.
+  access_key_default_duration_days = 90
+
   users_map = {
     for user in var.users : user.name => user
   }
@@ -19,10 +22,11 @@ locals {
   user_access_keys = merge([
     for user in var.users : {
       for key in try(user.access_keys, []) : "${user.name}-${key.name}" => {
-        user_name = user.name
-        key_name  = key.name
-        status    = try(key.status, "Active")
-        pgp_key   = try(local.user_pgp_key_map[user.name], "") != "" ? local.user_pgp_key_map[user.name] : null
+        user_name     = user.name
+        key_name      = key.name
+        status        = try(key.status, "Active")
+        duration_days = try(key.duration_days, local.access_key_default_duration_days)
+        pgp_key       = try(local.user_pgp_key_map[user.name], "") != "" ? local.user_pgp_key_map[user.name] : null
       }
       if !local.access_key_rotation_enabled || !contains(local.access_key_rotation_user_config_target_names, user.name)
     }
@@ -48,11 +52,29 @@ resource "aws_iam_user" "this" {
   tags     = local.all_tags
 }
 
+# Expires after duration_days. Once expired, time_rotating is dropped on refresh and
+# re-created on the next run, which changes time_static and replaces the access key.
+resource "time_rotating" "access_key" {
+  for_each      = local.user_access_keys
+  rotation_days = each.value.duration_days
+}
+
+# time_rotating re-creation is a create action, which replace_triggered_by ignores;
+# time_static turns it into a replacement so the access key rotation fires.
+resource "time_static" "access_key" {
+  for_each = local.user_access_keys
+  rfc3339  = time_rotating.access_key[each.key].rfc3339
+}
+
 resource "aws_iam_access_key" "this" {
   for_each = local.user_access_keys
   user     = aws_iam_user.this[each.value.user_name].name
   status   = each.value.status
   pgp_key  = each.value.pgp_key
+
+  lifecycle {
+    replace_triggered_by = [time_static.access_key[each.key]]
+  }
 }
 
 resource "aws_iam_user_login_profile" "this" {
