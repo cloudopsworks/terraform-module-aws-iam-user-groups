@@ -44,6 +44,9 @@ We have [*lots of terraform modules*][terraform_modules] that are Open Source an
 
 ## Introduction
 
+> [!WARNING]
+> **v1.4.0 is a bad release — skip it.** It introduced a Lambda-based access key rotation that has been removed, because a runtime Lambda has no context of where a key is used. Upgrade from v1.3.x directly to v1.5.0 or later. If v1.4.0 is already deployed, follow [Upgrading from v1.4.0](#upgrading-from-v140-bad-release).
+
 This module standardizes IAM user, group, and policy management across CloudOps Works AWS accounts and environments. It is designed for Terragrunt scaffolding and exposes stable non-secret metadata outputs for downstream modules and operations.
 
 Key capabilities include:
@@ -202,9 +205,9 @@ Four outputs, each a map keyed by name so downstream modules can look entries up
 
 Example: `dependency.iam.outputs.groups["developers"].arn`.
 
-## Upgrading from v1.4.x (Lambda rotation removed)
+## Upgrading from v1.4.0 (bad release)
 
-The Secrets Manager/Lambda rotation control plane (`access_key_rotation`) has been removed; a runtime Lambda has no context of where a key is used, so rotation now happens at the IaC level. Deployments that never enabled `access_key_rotation` need no action. If it was enabled:
+v1.4.0 should be skipped: pin deployments to v1.3.x or v1.5.0+, never `ref=v1.4.0`. Its Secrets Manager/Lambda rotation control plane (`access_key_rotation`) has been removed; a runtime Lambda has no context of where a key is used, so rotation now happens at the IaC level. Deployments that never enabled `access_key_rotation` need no action. If it was enabled:
 
 | What happens on upgrade | Action |
 |-------------------------|--------|
