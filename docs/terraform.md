@@ -3,7 +3,6 @@
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
-| <a name="requirement_archive"></a> [archive](#requirement\_archive) | ~> 2.7 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.35 |
 | <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.13 |
 
@@ -11,7 +10,6 @@
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_archive"></a> [archive](#provider\_archive) | 2.8.1 |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 6.71.0 |
 | <a name="provider_time"></a> [time](#provider\_time) | 0.14.2 |
 | <a name="provider_tls"></a> [tls](#provider\_tls) | 4.4.2 |
@@ -26,7 +24,6 @@
 
 | Name | Type |
 | ---- | ---- |
-| [aws_cloudwatch_log_group.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
 | [aws_iam_access_key.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_access_key) | resource |
 | [aws_iam_group.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group) | resource |
 | [aws_iam_group.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group) | resource |
@@ -38,38 +35,25 @@
 | [aws_iam_group_policy_attachment.prefixed_refs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_group_policy_attachment) | resource |
 | [aws_iam_policy.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_policy.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
-| [aws_iam_role.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
-| [aws_iam_role_policy.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_service_specific_credential.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_service_specific_credential) | resource |
 | [aws_iam_user.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user) | resource |
 | [aws_iam_user_group_membership.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_group_membership) | resource |
 | [aws_iam_user_login_profile.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_login_profile) | resource |
 | [aws_iam_user_ssh_key.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_user_ssh_key) | resource |
-| [aws_lambda_function.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
-| [aws_lambda_permission.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_permission) | resource |
-| [aws_secretsmanager_secret.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
-| [aws_secretsmanager_secret.access_key_rotation_config](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.user_login](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.user_secret](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
-| [aws_secretsmanager_secret_rotation.access_key_rotation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_rotation) | resource |
-| [aws_secretsmanager_secret_version.access_key_rotation_config](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.user_login](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.user_secret](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [time_rotating.access_key](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/rotating) | resource |
 | [time_static.access_key](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/static) | resource |
 | [tls_private_key.this](https://registry.terraform.io/providers/hashicorp/tls/latest/docs/resources/private_key) | resource |
-| [archive_file.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
-| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_iam_group.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_group) | data source |
 | [aws_iam_policy.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy) | data source |
 | [aws_iam_policy.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy) | data source |
-| [aws_iam_policy_document.access_key_rotation_lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
-| [aws_iam_policy_document.access_key_rotation_lambda_assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.named](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.named_inline](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.prefixed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.prefixed_inline](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
-| [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 | [aws_secretsmanager_secret_version.pgp_public_key](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.user_pgp_public_key](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
@@ -78,7 +62,6 @@
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_access_key_rotation"></a> [access\_key\_rotation](#input\_access\_key\_rotation) | Optional AWS Secrets Manager IAM access key rotation control plane. Disabled by default. See comments above for full schema. | `any` | `{}` | no |
 | <a name="input_default_pgp_key"></a> [default\_pgp\_key](#input\_default\_pgp\_key) | Default PGP key for encrypting secrets. Accepts raw armored PGP or "\_aws:<secret\_id>" to load it from AWS Secrets Manager. | `string` | `""` | no |
 | <a name="input_extra_tags"></a> [extra\_tags](#input\_extra\_tags) | Extra tags to add to the resources | `map(string)` | `{}` | no |
 | <a name="input_groups"></a> [groups](#input\_groups) | List of IAM groups (named or prefixed). See comments above for full schema. | `any` | `[]` | no |
@@ -93,7 +76,6 @@
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_access_key_rotation"></a> [access\_key\_rotation](#output\_access\_key\_rotation) | Non-secret metadata for the optional AWS Secrets Manager IAM access key rotation control plane. Secret values are not included. |
 | <a name="output_group_inline_policies"></a> [group\_inline\_policies](#output\_group\_inline\_policies) | Resolved IAM group inline policies keyed by module logical attachment name. |
 | <a name="output_group_policy_attachments"></a> [group\_policy\_attachments](#output\_group\_policy\_attachments) | Resolved IAM group managed-policy attachments, including external policy ARNs and module policy references. |
 | <a name="output_groups"></a> [groups](#output\_groups) | IAM group metadata for managed and referenced groups. Secret values are not included. |

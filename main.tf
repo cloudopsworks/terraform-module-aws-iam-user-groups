@@ -28,9 +28,18 @@ locals {
         duration_days = try(key.duration_days, local.access_key_default_duration_days)
         pgp_key       = try(local.user_pgp_key_map[user.name], "") != "" ? local.user_pgp_key_map[user.name] : null
       }
-      if !local.access_key_rotation_enabled || !contains(local.access_key_rotation_user_config_target_names, user.name)
     }
   ]...)
+
+  user_pgp_secret_ids = {
+    for user in var.users : user.name => replace(user.pgp_key, "_aws:", "")
+    if try(user.pgp_key, "") != "" && startswith(try(user.pgp_key, ""), "_aws:")
+  }
+  user_pgp_key_map = {
+    for user in var.users : user.name => try(user.pgp_key, "") != "" ? (
+      startswith(try(user.pgp_key, ""), "_aws:") ? try(data.aws_secretsmanager_secret_version.user_pgp_public_key[user.name].secret_string, "") : user.pgp_key
+    ) : local.default_pgp_key
+  }
 
   user_console_access = {
     for user in var.users : user.name => user
@@ -45,6 +54,11 @@ data "aws_secretsmanager_secret_version" "pgp_public_key" {
 }
 
 # IAM USERS
+data "aws_secretsmanager_secret_version" "user_pgp_public_key" {
+  for_each  = local.user_pgp_secret_ids
+  secret_id = each.value
+}
+
 resource "aws_iam_user" "this" {
   for_each = local.users_map
   name     = each.value.name
